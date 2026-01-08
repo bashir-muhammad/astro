@@ -4,7 +4,6 @@ description: "Where static site generation is heading in the next few years."
 pubDate: 2025-02-01
 author: "Taylor Brooks"
 tags: ["ssg", "web", "performance"]
-draft: true,
 slug: "the-future-of-static-sites"
 ---
 

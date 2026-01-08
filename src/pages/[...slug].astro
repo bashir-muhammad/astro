@@ -17,7 +17,7 @@ import Layout from "../layouts/layout.astro";
 ---
 <Layout title={entry.data.title}>
 
-  <article>
+  <article >
     <header>
     <h1>{entry.data.title}</h1>
     <p><em>By {entry.data.author} on {entry.data.pubDate.toDateString()}</em></p>
@@ -25,7 +25,7 @@ import Layout from "../layouts/layout.astro";
       {entry.data.description}
     </div>
     </header>
-    <div>
+    <div class="prose mx-auto pt-4">
       <Content />
     </div>
   </article>
