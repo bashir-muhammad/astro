@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig } from "astro/config";
+import { defineConfig, fontProviders } from "astro/config";
 import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
@@ -10,5 +10,21 @@ export default defineConfig({
   // @ts-ignore
   alias: {
     "@": "./src",
+  },
+  experimental: {
+    fonts: [
+      {
+        provider: fontProviders.google(),
+        name: "Inter",
+        cssVariable: "--font-inter",
+        fallbacks: ["ui-sans-serif", "system-ui"],
+      },
+      {
+        provider: fontProviders.google(),
+        name: "JetBrains Mono",
+        cssVariable: "--font-jetbrains-mono",
+        fallbacks: ["ui-monospace", "SFMono-Regular"],
+      },
+    ],
   },
 });
