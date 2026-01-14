@@ -4,7 +4,7 @@ import type { CollectionEntry } from "astro:content";
 import { Image } from "astro:assets";
 import { Calendar, ArrowRight } from "@lucide/astro";
 import placeHolderImage from "../images/placeholder.svg";
-import Layout from "../layouts/layout.astro";
+import Layout from "@/layouts/layout.astro";
 import {
   Card,
   CardHeader,
@@ -39,10 +39,10 @@ const allAuthors = Array.from(authorsSet).sort();
 <Layout title="Blog Posts">
   <div>
     <Hero
-    title="Blogs for Frontend Developer"
-    description="All the resources you need for Frontend."
-    features={["React", "Next.js", "Astro"]}
-  />
+      title="Blogs for Frontend Developer"
+      description="All the resources you need for Frontend."
+      features={["React", "Next.js", "Astro"]}
+    />
     <div class="grid lg:grid-cols-[1fr_280px] gap-12 my-12 lg:my-16">
       <div class="flex flex-col gap-6">
         {
@@ -129,7 +129,10 @@ const allAuthors = Array.from(authorsSet).sort();
                   class="justify-between! group"
                 >
                   <span class="capitalize">{author}</span>
-                  <ArrowRight class="w-5 h-5 text-muted-foreground group-hover:text-accent" slot="icon-right" />
+                  <ArrowRight
+                    class="w-5 h-5 text-muted-foreground group-hover:text-accent"
+                    slot="icon-right"
+                  />
                 </Button>
               ))
             }
