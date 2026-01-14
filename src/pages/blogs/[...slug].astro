@@ -15,7 +15,7 @@ export async function getStaticPaths() {
 
 const { entry } = Astro.props;
 const { Content } = await entry.render();
-import Layout from "../layouts/layout.astro";
+import Layout from "@/layouts/layout.astro";
 import Badge from "@/components/ui/badge.astro";
 ---
 
