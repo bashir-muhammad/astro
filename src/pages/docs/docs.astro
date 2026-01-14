@@ -1,26 +1,16 @@
 ---
 import type { CollectionEntry } from "astro:content";
 import { getCollection } from "astro:content";
-import { BookOpen } from "@lucide/astro";
+import { BookOpen, ArrowRight } from "@lucide/astro";
 import Layout from "@/layouts/layout.astro";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import Hero from "@/components/ui/hero.astro";
-
+import Button from "@/components/ui/button.astro";
 
 const allDocs: CollectionEntry<"docs">[] = await getCollection("docs");
-const technologies = [
-  ...new Set(allDocs.map((doc) => doc.data.technology)),
-];
+const technologies = [...new Set(allDocs.map((doc) => doc.data.technology))];
 
-const categoryOrder = [
-  ...new Set(allDocs.map((doc) => doc.data.category)),
-];
+const categoryOrder = [...new Set(allDocs.map((doc) => doc.data.category))];
 
 function sortDocs(a: CollectionEntry<"docs">, b: CollectionEntry<"docs">) {
   return (
@@ -48,7 +38,7 @@ const docsByTech = technologies.map((technology) => {
   title="Developer Documentation"
   description="Everything you need to build amazing applications"
 >
-  <Hero 
+  <Hero
     title="Developer Documentation"
     subtitle=" "
     description="Comprehensive guides, overviews and best practices—all in one place."
@@ -57,7 +47,7 @@ const docsByTech = technologies.map((technology) => {
 
   <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
     {
-      docsByTech.map(({ technology,  categories }) => (
+      docsByTech.map(({ technology, categories }) => (
         <Card as="section" aria-labelledby={`${technology}-heading`}>
           <div class="p-6 flex flex-col gap-6">
             <CardHeader class="flex gap-4 items-center">
@@ -65,9 +55,7 @@ const docsByTech = technologies.map((technology) => {
                 <BookOpen class="w-5 h-5 text-accent" />
               </div>
               <CardTitle>
-                <h2 class="heading-card capitalize">
-                  {technology}
-                </h2>
+                <h2 class="heading-card capitalize">{technology}</h2>
               </CardTitle>
             </CardHeader>
 
@@ -82,12 +70,15 @@ const docsByTech = technologies.map((technology) => {
                       <ul class="space-y-2">
                         {docs.map((doc) => (
                           <li>
-                            <a
+                            <Button
+                              variant="ghost"
+                              size="md"
                               href={`/docs/${doc.slug}`}
-                              class="text-sm text-foreground/80 hover:text-accent transition-colors"
+                              class="justify-between! w-full group"
                             >
                               {doc.data.title}
-                            </a>
+                              <ArrowRight class="w-5 h-5 text-muted-foreground group-hover:text-accent" slot="icon-right" />
+                            </Button>
                           </li>
                         ))}
                       </ul>

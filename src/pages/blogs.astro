@@ -14,6 +14,9 @@ blogCollection.forEach((post) => {
 });
 
 const allTags = Array.from(tagsCount.entries());
+const allAuthors = Array.from(
+  new Set(blogCollection.map((post) => post.data.author)),
+)
 
 import Layout from "../layouts/layout.astro";
 import {
@@ -26,11 +29,16 @@ import {
 } from "@/components/ui/card";
 import Badge from "@/components/ui/badge.astro";
 import Button from "@/components/ui/button.astro";
+import Hero from "@/components/ui/hero.astro";
 ---
 
 <Layout title="Blog Posts">
   <div>
-    <h1 class="heading-page">Blog Posts</h1>
+    <Hero
+    title="Blogs for Frontend Developer"
+    description="All the resources you need for Frontend."
+    features={["React", "Next.js", "Astro"]}
+  />
     <div class="grid lg:grid-cols-[1fr_280px] gap-12 my-12 lg:my-16">
       <div class="flex flex-col gap-6">
         {
@@ -96,6 +104,24 @@ import Button from "@/components/ui/button.astro";
                 >
                   <span class="capitalize">{tag}</span>
                   <span class="text-xs text-muted-foreground">{count}</span>
+                </Button>
+              ))
+            }
+          </div>
+        </Card>
+        <Card class="p-6 mt-6">
+          <h3 class="font-semibold mb-4">Authors</h3>
+          <div class="space-y-2 flex flex-col">
+            {
+              allAuthors.map((author) => (
+                <Button
+                  variant="ghost"
+                  size="md"
+                  href={`/authors/${author}`}
+                  class="justify-between! group"
+                >
+                  <span class="capitalize">{author}</span>
+                  <ArrowRight class="w-5 h-5 text-muted-foreground group-hover:text-accent" slot="icon-right" />
                 </Button>
               ))
             }
