@@ -3,7 +3,7 @@ import { getCollection } from "astro:content";
 import type { CollectionEntry } from "astro:content";
 import { Image } from "astro:assets";
 import { Calendar, ArrowRight } from "@lucide/astro";
-import placeHolderImage from "../images/placeholder.svg";
+import placeHolderImage from "@/images/placeholder.svg";
 import Layout from "@/layouts/layout.astro";
 import {
   Card,
@@ -17,7 +17,7 @@ import Badge from "@/components/ui/badge.astro";
 import Button from "@/components/ui/button.astro";
 import Hero from "@/components/ui/hero.astro";
 
-const blogCollection: CollectionEntry<"blogs">[] = await getCollection("blogs");
+const blogCollection: CollectionEntry<"blogs">[] = (await getCollection("blogs")).filter(post => !post.data.draft);
 
 // Compute tags and authors once instead of on every render
 const tagsCount = new Map<string, number>();
