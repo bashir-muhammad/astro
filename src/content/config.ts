@@ -18,8 +18,8 @@ export const collections = {
     schema: z.object({
       title: z.string(),
       description: z.string(),
-      technology: z.enum(["astro", "nextjs", "react", "vue", "svelte"]),
-      category: z.enum(["introduction", "best-practices", "know-how"]),
+      technology: z.string(),
+      category: z.string(),
       order: z.number().default(0),
       draft: z.boolean().default(false),
       lastUpdated: z.coerce.date().optional(), // Changed from z.date() to z.coerce.date()
