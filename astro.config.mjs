@@ -5,6 +5,17 @@ import mdx from "@astrojs/mdx";
 
 // https://astro.build/config
 export default defineConfig({
+  image: {
+    service: {
+      entrypoint: "astro/assets/services/sharp",
+      config: {
+        limitInputPixels: false,
+      },
+    },
+    // @ts-ignore
+    formats: ["image/webp", "image/avif", "image/png", "image/jpeg"],
+    cacheDir: "./.astro/cache/images",
+  },
   vite: {
     plugins: [tailwindcss()],
   },
