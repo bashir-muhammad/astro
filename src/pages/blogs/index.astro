@@ -2,23 +2,9 @@
 import { getCollection } from "astro:content";
 import type { CollectionEntry } from "astro:content";
 import { Image } from "astro:assets";
-const blogCollection: CollectionEntry<"blogs">[] = await getCollection("blogs");
 import { Calendar, ArrowRight } from "@lucide/astro";
 import placeHolderImage from "../images/placeholder.svg";
-
-const tagsCount = new Map<string, number>();
-blogCollection.forEach((post) => {
-  post.data.tags?.forEach((tag) =>
-    tagsCount.set(tag, (tagsCount.get(tag) ?? 0) + 1),
-  );
-});
-
-const allTags = Array.from(tagsCount.entries());
-const allAuthors = Array.from(
-  new Set(blogCollection.map((post) => post.data.author)),
-)
-
-import Layout from "../layouts/layout.astro";
+import Layout from "@/layouts/layout.astro";
 import {
   Card,
   CardHeader,
@@ -30,15 +16,33 @@ import {
 import Badge from "@/components/ui/badge.astro";
 import Button from "@/components/ui/button.astro";
 import Hero from "@/components/ui/hero.astro";
+
+const blogCollection: CollectionEntry<"blogs">[] = await getCollection("blogs");
+
+// Compute tags and authors once instead of on every render
+const tagsCount = new Map<string, number>();
+const authorsSet = new Set<string>();
+
+blogCollection.forEach((post) => {
+  post.data.tags?.forEach((tag) =>
+    tagsCount.set(tag, (tagsCount.get(tag) ?? 0) + 1),
+  );
+  if (post.data.author) {
+    authorsSet.add(post.data.author);
+  }
+});
+
+const allTags = Array.from(tagsCount.entries()).sort((a, b) => b[1] - a[1]);
+const allAuthors = Array.from(authorsSet).sort();
 ---
 
 <Layout title="Blog Posts">
   <div>
     <Hero
-    title="Blogs for Frontend Developer"
-    description="All the resources you need for Frontend."
-    features={["React", "Next.js", "Astro"]}
-  />
+      title="Blogs for Frontend Developer"
+      description="All the resources you need for Frontend."
+      features={["React", "Next.js", "Astro"]}
+    />
     <div class="grid lg:grid-cols-[1fr_280px] gap-12 my-12 lg:my-16">
       <div class="flex flex-col gap-6">
         {
@@ -49,8 +53,12 @@ import Hero from "@/components/ui/hero.astro";
                   <Image
                     src={post.data.image ?? placeHolderImage}
                     alt={post.data.title}
-                    sizes="(max-width: 768px) 680px, 240px"
+                    width={240}
+                    height={240}
+                    densities={[1.5, 2]}
+                    sizes="(max-width: 768px) 100vw, 240px"
                     class="object-cover aspect-4/3 md:aspect-square group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
                   />
                 </div>
                 <div class="flex flex-col pb-6 md:py-6 px-6 md:pl-0">
@@ -121,7 +129,10 @@ import Hero from "@/components/ui/hero.astro";
                   class="justify-between! group"
                 >
                   <span class="capitalize">{author}</span>
-                  <ArrowRight class="w-5 h-5 text-muted-foreground group-hover:text-accent" slot="icon-right" />
+                  <ArrowRight
+                    class="w-5 h-5 text-muted-foreground group-hover:text-accent"
+                    slot="icon-right"
+                  />
                 </Button>
               ))
             }

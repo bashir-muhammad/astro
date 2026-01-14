@@ -1,6 +1,5 @@
 ---
 import { Image } from "astro:assets";
-import Button from "./ui/button.astro";
 ---
 
 <header
@@ -11,8 +10,8 @@ import Button from "./ui/button.astro";
       <Image
         src="/images/astro-logo.png"
         alt="My Astro Site Logo"
-        width={86}
-        height={86}
+        width={48}
+        height={48}
         class="w-12 h-12 aspect-square object-cover"
       />
       <span>DocsBlog</span>
@@ -44,11 +43,5 @@ import Button from "./ui/button.astro";
         Documentation
       </a>
     </nav>
-
-    <div class="flex items-center gap-3">
-      <!-- <Button variant="ghost" size="icon" class="w-9 h-9"> -->
-      <!-- <Search class="w-4 h-4" /> -->
-      <!-- </Button> -->
-    </div>
   </div>
 </header>
