@@ -47,7 +47,7 @@ const allAuthors = Array.from(authorsSet).sort();
       <div class="flex flex-col gap-6">
         {
           blogCollection.map((post) => (
-            <a href={`/pages/${post.slug}`} class="group">
+            <a href={`/blogs/${post.slug}`} class="group">
               <Card class="grid md:grid-cols-[240px_1fr]">
                 <div class="relative overflow-hidden">
                   <Image
