@@ -16,6 +16,7 @@ export default defineConfig({
     formats: ["image/webp", "image/avif", "image/png", "image/jpeg"],
     cacheDir: "./.astro/cache/images",
   },
+  site: "http://localhost:4321",
   vite: {
     plugins: [tailwindcss()],
   },
