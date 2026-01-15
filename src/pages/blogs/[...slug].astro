@@ -80,13 +80,13 @@ const readingTime = getReadingTime(rawContent);
       <div class="prose mx-auto max-w-none w-full">
         <Content />
       </div>
-      <aside class="hidden lg:block">
-        {
-          headings.length > 1 && (
-            <TableOfContent headings={headings} />
-          )
-        }
-      </aside>
+      {
+        headings.length > 1 && (
+          <aside class="hidden lg:block">
+          <TableOfContent headings={headings} />
+          </aside>
+        )
+      }
     </div>
   </article>
 </Layout>
