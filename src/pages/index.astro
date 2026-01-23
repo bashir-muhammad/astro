@@ -115,7 +115,7 @@ const docCollection: CollectionEntry<"docs">[] = (await getCollection("docs"))
         docCollection.map((doc) => (
           <a
             href={`/docs/${doc.slug}`}
-            class="group flex gap-4 md:gap-6 border-b hover:border-accent/50 transition-colors"
+            class="group flex gap-4 md:gap-6 border-b hover:border-accent/50 transition-colors pb-4 md:pb-6"
           >
             <div class="w-10 h-10 rounded-lg bg-muted border border-border group-hover:border-accent/20 flex items-center justify-center">
               <BookOpen class="w-5 h-5 text-muted-foreground group-hover:text-accent" />
@@ -132,12 +132,8 @@ const docCollection: CollectionEntry<"docs">[] = (await getCollection("docs"))
                   {doc.data.description}
                 </p>
               </CardContent>
-              <CardFooter class="px-4 pb-4 mt-auto">
-                <CardAction class="ml-auto">
-                  <ArrowRight class="w-5 h-5 text-muted-foreground group-hover:text-accent transition-colors" />
-                </CardAction>
-              </CardFooter>
             </Card>
+            <ArrowRight class="w-5 h-5 text-muted-foreground group-hover:text-accent transition-colors self-end" />
           </a>
         ))
       }
