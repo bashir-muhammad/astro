@@ -34,8 +34,7 @@ const blogCollection: CollectionEntry<"blogs">[] = (
 const docCollection: CollectionEntry<"docs">[] = (await getCollection("docs"))
   .filter((doc) => !doc.data.draft)
   .sort(
-    (a, b) =>
-      toTimestamp(b.data.lastUpdated) - toTimestamp(a.data.lastUpdated),
+    (a, b) => toTimestamp(b.data.lastUpdated) - toTimestamp(a.data.lastUpdated),
   )
   .slice(0, 4);
 ---
@@ -50,13 +49,12 @@ const docCollection: CollectionEntry<"docs">[] = (await getCollection("docs"))
   <Section>
     <h2 class="heading-section mb-6 md:mb-8">Latest Blogs</h2>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div class="basis-1/4">
-        <p>
-          Explore our latest articles, tutorials, and insights on web
-          development, design, and more. Stay updated with the newest trends and
-          best practices in the industry.
-        </p>
-      </div>
+      <p>
+        Explore our latest articles, tutorials, and insights on web development,
+        design, and more. Stay updated with the newest trends and best practices
+        in the industry.
+      </p>
+
       {
         blogCollection.map((blog) => (
           <a href={`/blogs/${blog.slug}`} class="group">
@@ -88,7 +86,7 @@ const docCollection: CollectionEntry<"docs">[] = (await getCollection("docs"))
     </div>
   </Section>
 
-  <Section class="md:grid md:grid-cols-3 gap-6 md:gap-8">
+  <Section class="md:grid md:grid-cols-3 gap-8 lg:gap-16">
     <div>
       <Badge variant="secondary" size="md">
         <FileMinus slot="icon-left" />
@@ -100,12 +98,7 @@ const docCollection: CollectionEntry<"docs">[] = (await getCollection("docs"))
         features, improvements, and best practices to make the most out of our
         tools and services.
       </p>
-      <Button
-        variant="ghost"
-        size="md"
-        class="mt-6 md:mt-8"
-        href="/docs"
-      >
+      <Button variant="ghost" size="md" class="mt-6 md:mt-8" href="/docs">
         View All Documentation
         <ArrowRightIcon slot="icon-right" />
       </Button>
