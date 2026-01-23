@@ -47,14 +47,19 @@ const docCollection: CollectionEntry<"docs">[] = (await getCollection("docs"))
   />
 
   <Section>
-    <h2 class="heading-section mb-6 md:mb-8">Latest Blogs</h2>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <p>
-        Explore our latest articles, tutorials, and insights on web development,
-        design, and more. Stay updated with the newest trends and best practices
-        in the industry.
-      </p>
-
+      <div class="md:pr-4">
+        <h2 class="heading-section mb-6 md:mb-8">Latest Blogs</h2>
+        <p>
+          Explore our latest articles, tutorials, and insights on web
+          development, design, and more. Stay updated with the newest trends and
+          best practices in the industry.
+        </p>
+        <Button variant="link" size="md" class="mt-6 md:mt-8" href="/blogs">
+          View All Blogs
+          <ArrowRightIcon slot="icon-right" />
+        </Button>
+      </div>
       {
         blogCollection.map((blog) => (
           <a href={`/blogs/${blog.slug}`} class="group">
@@ -98,7 +103,7 @@ const docCollection: CollectionEntry<"docs">[] = (await getCollection("docs"))
         features, improvements, and best practices to make the most out of our
         tools and services.
       </p>
-      <Button variant="ghost" size="md" class="mt-6 md:mt-8" href="/docs">
+      <Button variant="link" size="md" class="mt-6 md:mt-8" href="/docs">
         View All Documentation
         <ArrowRightIcon slot="icon-right" />
       </Button>
