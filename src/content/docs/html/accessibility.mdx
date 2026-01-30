@@ -1,0 +1,155 @@
+---
+title: "Accessibility"
+description: "An overview of accessibility best practices in HTML."
+technology: "html"
+category: "accessibility"
+order: 4
+lastUpdated: 2026-01-10
+authors: ["john-doe"]
+tags: ["html", "accessibility"]
+---
+
+
+## Core Principles
+
+1. Use native HTML elements (`<button>`, `<a>`, `<input>`) before resorting to ARIA.
+2. Provide text alternatives
+    - **`alt`**: Mandatory for images. Leave empty (`alt=""`) *only* if decorative.
+    - **`aria-label`**: String label for elements without visible text (e.g., an "X" close icon).
+3. Ensure keyboard navigation
+4. Maintain color contrast
+5. Support screen readers
+6. **Headings**: Do not skip levels (e.g., `h1` to `h3` is bad).
+7. **Focus**: Never remove outlines (`outline: none`) without providing a custom `:focus-visible` style.
+8. **`aria-expanded`**: `true`/`false`. Essential for dropdowns/menus.
+9. **`role`**: Overrides semantic meaning (e.g., `role="alert"`). Use sparingly.
+
+## Semantic HTML Over ARIA
+
+```html
+<!-- ❌ Bad: Generic div with ARIA -->
+<div role="button" tabindex="0" onclick="handleClick()">
+  Click me
+</div>
+
+<!-- ✅ Good: Native button -->
+<button onclick="handleClick()">Click me</button>
+
+<!-- ❌ Bad: DIV navigation -->
+<div role="navigation">
+  <span onclick="navigate()">Link</span>
+</div>
+
+<!-- ✅ Good: Semantic navigation -->
+<nav>
+  <a href="/page">Link</a>
+</nav>
+
+```
+
+## ARIA Attributes (When Needed)
+
+```html
+<!-- Landmark roles (prefer semantic HTML) -->
+<div role="main">...</div> <!-- Use <main> instead -->
+<div role="navigation">...</div> <!-- Use <nav> instead -->
+<div role="banner">...</div> <!-- Use <header> instead -->
+
+<!-- Widget roles -->
+<div role="tab" aria-selected="true">Tab 1</div>
+<div role="tabpanel" aria-labelledby="tab1">Panel content</div>
+
+<!-- Live regions -->
+<div role="status" aria-live="polite">Processing...</div>
+<div role="alert" aria-live="assertive">Error occurred!</div>
+
+<!-- Hidden content -->
+<div aria-hidden="true">Hidden from screen readers</div>
+
+<!-- Expanded/collapsed state -->
+<button aria-expanded="false" aria-controls="menu">Menu</button>
+<div id="menu" hidden>Menu content</div>
+
+<!-- Current state -->
+<a href="/home" aria-current="page">Home</a>
+<a href="/step-2" aria-current="step">Step 2</a>
+
+<!-- Labels and descriptions -->
+<button aria-label="Close dialog">×</button>
+<input type="text" aria-describedby="hint" />
+<span id="hint">Enter at least 8 characters</span>
+
+```
+
+## Keyboard Navigation
+
+```html
+<!-- Focusable elements -->
+<button>Native focus</button>
+<a href="/page">Native focus</a>
+
+<!-- Make non-focusable elements focusable -->
+<div tabindex="0">Can receive focus</div>
+
+<!-- Remove from tab order -->
+<button tabindex="-1">Programmatically focusable only</button>
+
+<!-- Skip to main content -->
+<a href="#main" class="skip-link">Skip to main content</a>
+<main id="main">...</main>
+
+```
+
+### Form Accessibility
+
+```html
+<form>
+  <!-- Always associate labels -->
+  <label for="email">Email</label>
+  <input type="email" id="email" required aria-required="true" />
+
+  <!-- Group related fields -->
+  <fieldset>
+    <legend>Contact preferences</legend>
+    <label>
+      <input type="checkbox" name="email-opt-in" />
+      Email updates
+    </label>
+  </fieldset>
+
+  <!-- Error messages -->
+  <input
+    type="email"
+    aria-invalid="true"
+    aria-describedby="email-error"
+  />
+  <span id="email-error" role="alert">
+    Please enter a valid email
+  </span>
+</form>
+
+```
+
+## Image Accessibility
+
+```html
+<!-- Descriptive alt text -->
+<img src="chart.png" alt="Bar chart showing 45% increase in sales" />
+
+<!-- Decorative image -->
+<img src="decoration.png" alt="" role="presentation" />
+
+<!-- Complex image with long description -->
+<figure>
+  <img src="complex-chart.png" alt="Sales data visualization" />
+  <figcaption>
+    <details>
+      <summary>Full description</summary>
+      <p>Detailed explanation of the chart data...</p>
+    </details>
+  </figcaption>
+</figure>
+
+```
+
+---

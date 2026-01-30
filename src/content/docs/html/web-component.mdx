@@ -1,0 +1,109 @@
+---
+title: "Web Component"
+description: "An overview of Web Component in HTML."
+technology: "html"
+category: "web-development"
+order: 2
+lastUpdated: 2026-01-10
+authors: ["john-doe"]
+tags: ["html", "web-components"]
+---
+
+
+Web Components are reusable custom elements powered by native browser APIs.
+
+## Template Element
+
+```html
+<!-- Define reusable markup -->
+<template id="card-template">
+  <div class="card">
+    <h3 class="card-title"></h3>
+    <p class="card-content"></p>
+  </div>
+</template>
+
+<script>
+  const template = document.getElementById('card-template');
+  const clone = template.content.cloneNode(true);
+  // Modify clone and append to DOM
+</script>
+
+```
+
+## Slot Element
+
+```html
+<!-- In Shadow DOM template -->
+<template id="user-card">
+  <div class="card">
+    <slot name="username">Default Name</slot>
+    <slot name="email">No email</slot>
+    <slot>Default content</slot>
+  </div>
+</template>
+
+<!-- Usage -->
+<user-card>
+  <span slot="username">John Doe</span>
+  <span slot="email">john@example.com</span>
+  <p>Additional content goes in default slot</p>
+</user-card>
+
+```
+
+## Custom Elements
+
+```html
+<!-- Define custom element -->
+<script>
+  class UserCard extends HTMLElement {
+    constructor() {
+      super();
+      // Attach shadow DOM
+      this.attachShadow({ mode: 'open' });
+    }
+
+    connectedCallback() {
+      this.shadowRoot.innerHTML = `
+        <style>:host { display: block; }</style>
+        <div class="card">
+          <slot></slot>
+        </div>
+      `;
+    }
+  }
+
+  customElements.define('user-card', UserCard);
+</script>
+
+<!-- Use custom element -->
+<user-card>Content</user-card>
+
+<!-- Customize built-in elements -->
+<button is="fancy-button">Click me</button>
+
+```
+
+## Web Component Attributes
+
+- `part` – Exposes shadow DOM parts for styling
+- `exportparts` – Re-export parts from nested components
+- `slot` – Assign content to named slots
+
+```html
+<!-- In shadow DOM -->
+<style>
+  :host { display: block; }
+  ::part(button) { color: blue; }
+</style>
+<button part="button">Click</button>
+
+<!-- External styling -->
+<style>
+  user-card::part(button) { color: red; }
+</style>
+
+```
+
+---
