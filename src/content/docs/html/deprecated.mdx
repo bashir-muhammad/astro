@@ -1,0 +1,53 @@
+---
+title: "Deprecated and Avoided Features"
+description: "An overview of deprecated and avoided features in HTML."
+technology: "html"
+category: "accessibility"
+order: 5
+lastUpdated: 2026-01-10
+authors: ["john-doe"]
+tags: ["html", "deprecated", "best-practices"]
+---
+
+
+## Deprecated Elements
+
+Avoid these obsolete elements:
+
+- `<font>` – Use CSS
+- `<center>` – Use CSS text-align
+- `<big>`, `<small>` – Use CSS font-size (except `<small>` for fine print)
+- `<strike>`, `<s>` – Use `<del>` or CSS
+- `<tt>` – Use `<code>` or CSS
+- `<frame>`, `<frameset>` – Use modern layout
+- `<marquee>`, `<blink>` – Use CSS animations
+- `<applet>` – Use `<object>` or modern JS
+
+## Avoid Inline JavaScript
+
+```html
+<!-- ❌ Avoid -->
+<button onclick="handleClick()">Click</button>
+<a href="javascript:void(0)">Link</a>
+
+<!-- ✅ Better -->
+<button id="myButton">Click</button>
+<script>
+  document.getElementById('myButton')
+    .addEventListener('click', handleClick);
+</script>
+
+```
+
+## Avoid Inline Styles
+
+```html
+<!-- ❌ Avoid -->
+<p style="color: red; font-size: 16px;">Text</p>
+
+<!-- ✅ Better -->
+<p class="error-text">Text</p>
+
+```
+
+---

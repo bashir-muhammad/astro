@@ -1,0 +1,70 @@
+---
+title: "Performance Best Practices"
+description: "An overview of performance best practices in HTML."
+technology: "html"
+category: "performance"
+order: 6
+lastUpdated: 2026-01-10
+authors: ["john-doe"]
+tags: ["html", "performance", "best-practices"]
+---
+
+
+
+## Resource Hints
+
+```html
+<!-- Preconnect to required origins -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="dns-prefetch" href="https://api.example.com" />
+
+<!-- Preload critical resources -->
+<link rel="preload" href="critical.css" as="style" />
+<link rel="preload" href="font.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="hero.jpg" as="image" fetchpriority="high" />
+
+<!-- Prefetch for next navigation -->
+<link rel="prefetch" href="/next-page.html" />
+
+<!-- Prerender next page -->
+<link rel="prerender" href="/next-page.html" />
+
+<!-- Module preload -->
+<link rel="modulepreload" href="app.js" />
+
+```
+
+## Loading Strategies
+
+```html
+<!-- Lazy load images -->
+<img src="image.jpg" loading="lazy" />
+
+<!-- Prioritize important images -->
+<img src="hero.jpg" fetchpriority="high" />
+
+<!-- Async scripts -->
+<script src="analytics.js" async></script>
+
+<!-- Defer non-critical scripts -->
+<script src="app.js" defer></script>
+
+```
+
+## Critical CSS
+
+```html
+<head>
+  <!-- Inline critical CSS -->
+  <style>
+    /* Critical above-the-fold styles */
+  </style>
+
+  <!-- Async load full CSS -->
+  <link rel="preload" href="styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="styles.css" /></noscript>
+</head>
+
+```
+
+---

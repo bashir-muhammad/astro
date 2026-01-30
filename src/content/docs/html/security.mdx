@@ -1,0 +1,53 @@
+---
+title: "Security Best Practices"
+description: "An overview of security best practices in HTML."
+technology: "html"
+category: "security"
+order: 6
+lastUpdated: 2026-01-10
+authors: ["john-doe"]
+tags: ["html", "security", "best-practices"]
+---
+
+
+## Content Security Policy
+
+```html
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://trusted.com" />
+
+```
+
+## Subresource Integrity
+
+```html
+<script
+  src="https://cdn.example.com/library.js"
+  integrity="sha384-hash..."
+  crossorigin="anonymous"
+></script>
+
+```
+
+## Secure External Links
+
+```html
+<!-- Always use rel="noopener" for target="_blank" -->
+<a href="https://external.com" target="_blank" rel="noopener noreferrer">
+  External Site
+</a>
+
+```
+
+## Iframe Sandboxing
+
+```html
+<iframe
+  src="/embed"
+  sandbox="allow-scripts"
+  allow="camera 'none'; microphone 'none'"
+></iframe>
+
+```
+
+---

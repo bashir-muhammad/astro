@@ -1,0 +1,65 @@
+---
+title: "Script Loading Strategies"
+description: "An overview of script loading strategies in HTML."
+technology: "html"
+category: "web-development"
+order: 3
+lastUpdated: 2026-01-10
+authors: ["john-doe"]
+tags: ["html", "loading-strategies", "scripts"]
+---
+
+
+## Script Elements & Loading Strategies
+
+```html
+<!-- Classic script (blocking) -->
+<script src="app.js"></script>
+
+<!-- Async script (non-blocking, executes when ready) -->
+<script src="analytics.js" async></script>
+
+<!-- Deferred script (non-blocking, executes after DOM) -->
+<script src="app.js" defer></script>
+
+<!-- ES Module -->
+<script type="module" src="app.js"></script>
+
+<!-- Fallback for legacy browsers -->
+<script type="module" src="modern.js"></script>
+<script nomodule src="legacy.js"></script>
+
+<!-- Inline module -->
+<script type="module">
+  import { func } from './module.js';
+  func();
+</script>
+
+<!-- Import map -->
+<script type="importmap">
+{
+  "imports": {
+    "lodash": "https://cdn.jsdelivr.net/npm/lodash@4.17.21/+esm"
+  }
+}
+</script>
+
+<!-- Subresource Integrity (SRI) -->
+<script
+  src="https://cdn.example.com/library.js"
+  integrity="sha384-oqVuAfXRKap7fdgcCY5uykM6+R9GqQ8K/ux..."
+  crossorigin="anonymous"
+></script>
+s
+```
+
+### Script Attributes
+
+- `async` – Non-blocking, executes ASAP
+- `defer` – Non-blocking, executes after DOM parsing
+- `type="module"` – ES Module
+- `nomodule` – Fallback for older browsers
+- `integrity` – SRI hash for security
+- `crossorigin` – CORS mode (`"anonymous"`, `"use-credentials"`)
+- `referrerpolicy` – Referrer policy
+- `fetchpriority` – Loading priority (`"high"`, `"low"`, `"auto"`)

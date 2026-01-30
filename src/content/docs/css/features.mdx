@@ -1,0 +1,141 @@
+---
+title: "Core Features & Capabilities"
+description: "An overview of core features and capabilities in CSS."
+technology: "css"
+category: "features"
+order: 1
+lastUpdated: 2026-01-10
+authors: ["john-doe"]
+tags: ["css", "features"]
+---
+
+
+CSS has matured into a **full-featured design system language**, enabling scalable, themeable, and high-performance UI systems.
+
+### **Core Styling Capabilities**
+
+| **Feature** | **Description & Example** | **Advanced Usage / Best Practice** |
+| --- | --- | --- |
+| **Selectors** | Target elements by tag, class (`.btn`), ID (`#main`), attribute (`[data-role="nav"]`), or state (`:hover`, `:focus`, `:has()`).
+`:has()` **relational selector:**  lets you style a parent if it contains certain children.  | Use `:is()` and `:where()` to simplify complex selectors and control specificity. For instance, `:is(h1, h2, h3)` applies one rule to multiple elements.
+**Note:** broad use of `:has()` can be expensive, so it should be scoped carefully.
+**`:is, :where, :has, :not**,` enabling clearer and often more performant selector expressions |
+| **Cascade & Specificity** | Determines which rules apply when multiple match the same element. Higher specificity and later declarations override earlier ones. | Keep specificity flat (use single classes). Control order via `@layer` to avoid “specificity wars.” |
+| **Inheritance** | Some properties (e.g. `color`, `font-family`) inherit by default from their parent elements. | Use `inherit`, `initial`, or `unset` keywords to fine-tune behavior. Helps maintain consistency in typography and color systems. |
+| **Box Model** | Defines layout area: `content + padding + border + margin`. | Use `box-sizing: border-box` globally to simplify sizing math in responsive designs. |
+| **Display & Positioning** | Determine how elements flow: `block`, `inline`, `flex`, `grid`, etc. | Combine `display: contents` or `flow-root` for advanced layout control; `position: sticky` for scroll-linked UI patterns. |
+| **Color & Backgrounds** | Wide support for color formats, gradients, and multiple backgrounds. | Use modern color functions like `color-mix()` and `color(display-p3 …)` for richer, high-gamut designs. |
+
+### **Modern Layout Systems**
+
+| **Feature** | **Description & Example** | **Advanced Usage / Best Practice** |
+| --- | --- | --- |
+| **Flexbox** | Align and distribute items along one axis. Example: `display: flex; justify-content: space-between; align-items: center;`. Flexbox is content-aware (wraps based on content size). | Ideal for navbars, toolbars, and dynamic alignment. Combine with gap property (`gap: 1rem;`) for cleaner spacing. |
+| **CSS Grid** | Two-dimensional grid system with explicit rows/columns. 
+**Performance Characteristic:** Grid calculations happen once during layout. Reflows are optimized by browser engines.
+Grid is container-aware (fixed track structure).
+ | Use `minmax()` and `auto-fit/auto-fill` to create responsive grids. **Subgrid:** allows nested grids to align with parent grid tracks. 
+**When to use:** Complex page layouts, magazine-style designs, dashboard grids |
+| **Multi-Column Layout** | Flow text or content into multiple columns using `column-count` and `column-gap`. | Useful for articles, reports, or dashboards with dense information. |
+| **Container Queries (`@container`)** | Style components based on their container’s size rather than the viewport.
+**Performance:** Containment context creation has minimal cost (~1ms per container). Query evaluation is optimized.
+**Cascade Layers:** Explicit Specificity Control.
+**Specificity Problem:**
+Traditional CSS specificity rules:
+`!important > inline styles > IDs > classes > elements` | Enables truly reusable components; no more hard-coded breakpoints tied to screen width.
+**Architectural Impact:**
+- Components become truly portable
+- Eliminates "component variants" (small, medium, large)
+- Enables design system components that work in unknown contexts |
+| **Logical Properties** | Replace physical directions (`left`, `right`) with flow-relative ones (`inline-start`, `inline-end`). | Essential for supporting internationalization (RTL/LTR text). |
+
+### **Variables & Functions**
+
+| **Feature** | **Description & Example** | **Advanced Usage / Best Practice** |
+| --- | --- | --- |
+| **Custom Properties (`--var`)** | Allow runtime theming and dynamic value composition. Declare reusable values:
+`--primary: #0070f3; 
+color: var(--primary);`. | Cascade-aware and dynamic — perfect for theme systems or runtime style switching. |
+| **Math Functions** | Combine values dynamically: `width: calc(100% - 2rem); font-size: clamp(1rem, 2vw, 2rem);`. | Build fluid typography and responsive spacing without media queries. |
+| **Color Functions** | Advanced color manipulations like `color-mix(in srgb, red 70%, blue)` or `hsl()`. | Enables dynamic theming and color transitions for dark/light modes. |
+| **Environment Variables (`env()`)** | Access system UI safe areas: `padding-top: env(safe-area-inset-top);`. | Important for full-screen mobile layouts and notches (iOS/Android). |
+
+### **Visual & Interactive Features**
+
+| **Feature** | **Description & Example** | **Advanced Usage / Best Practice** |
+| --- | --- | --- |
+| **Transitions** | Smooth property changes, e.g. `transition: all 0.3s ease;`. | Transition only specific properties (`transform`, `opacity`) for better performance. |
+| **Animations & Keyframes** | Define sequences with `@keyframes`. | Use CSS animations for simple loops; offload complex sequences to the GPU. |
+| **Transforms** | Move or rotate elements (`transform: scale(1.1) rotate(10deg);`). | Combine with `will-change` to pre-optimize animations. |
+| **Filters** | Apply blur, brightness, contrast, etc. | Use for hover effects or background blurs (e.g. glassmorphism). |
+| **Blend Modes & Masks** | Control how layers blend or mask each other. | Enables advanced visual effects like overlays, cutouts, and compositing. |
+
+### Architecture & Structure
+
+| **Feature** | **Description & Example** | **Advanced Usage / Best Practice** |
+| --- | --- | --- |
+| **Cascade Layers (`@layer`)** | Define rule groups with explicit priority. Example:
+`@layer reset, base, theme, layout, components, utilities, overrides;`
+
+`@layer utilities { }` 
+`@layer components { }` | Enforce predictable style order without relying on specificity.
+**Team Coordination Benefit:** Different team members can work in different layers without conflicts. Designer edits `theme`, engineers edit `components`, anyone can add `utilities`.
+**Problem:** No way to define layer priority. "Last rule wins" creates unpredictability at scale. |
+| **@supports** | Conditional CSS based on feature detection: `@supports (display: grid) { … }`. | Gracefully degrade for older browsers. |
+| **@property** | Register custom property types for better parsing performance. | Makes custom props more robust for transitions and animations. |
+| **Nesting (CSS Nesting)** | Nest selectors within parent rules, much like Sass nesting, which can make component CSS more concise | Cleaner syntax. |
+| **Scoped CSS** | Limit styles to component scope via Shadow DOM or CSS Modules. | Prevents global cascade conflicts in large applications. |
+
+### **Responsive & Adaptive Design**
+
+| **Feature** | **Description & Example** | **Advanced Usage / Best Practice** |
+| --- | --- | --- |
+| **Media Queries (`@media`)** | Style by viewport width, height, orientation, or preference. | Use mobile-first approach; minimize breakpoint redundancy. |
+| **Container Queries** | Adjust styles based on parent container. “style rules based on the size of a container, not the viewport” | Enables true component modularity in design systems. |
+| **Fluid & Relative Units** | Use `vw`, `vh`, `%`, and `rem` for scalable designs. | Combine with `clamp()` for fluid typography. |
+| **Aspect-Ratio & Object-Fit** | Maintain media proportions. | Great for responsive image and video embeds. |
+| **Viewport Ranges** | Use `@media (width >= 600px)` syntax (Media Queries Level 4) for clarity. | Cleaner breakpoints and easier maintenance. |
+
+### **Accessibility & User Preferences:**
+
+| **Feature** | **Description & Example** | **Advanced Usage / Best Practice** |
+| --- | --- | --- |
+| **Reduced Motion (`prefers-reduced-motion`)** | Disable animations for users who prefer minimal motion. | Always provide graceful degradation for motion-sensitive users. |
+| **Color Scheme Detection (`prefers-color-scheme`)** | Switch automatically between light/dark themes. | Combine with CSS variables for seamless theme toggling. |
+| **High Contrast (`prefers-contrast`)** | Adjust styles for users needing higher contrast. | Use with system colors (`CanvasText`, `Canvas`) for automatic adaptation. |
+| **Focus Styles** | `:focus-visible` distinguishes between keyboard and mouse focus. | Improves UX without showing outlines for mouse users only. |
+|  |  |  |
+
+### **Integration & Extensibility:**
+
+| **Feature** | **Description & Example** | **Advanced Usage / Best Practice** |
+| --- | --- | --- |
+| **Web Components & Shadow DOM** | Encapsulate styles and markup for reusable components. | Ensures style isolation and reusability across projects. |
+| **CSSOM & Houdini APIs** | Extend CSS by writing custom layout/paint logic in JS. | Enables custom CSS properties and effects directly in browser rendering pipeline. |
+| **Layered Design Systems** | Combine `@layer`, variables, and modular CSS organization. | Used in large-scale design systems for predictability and scalability. |
+| **Media & Feature Queries** | `@media`, `@supports`, and `@container` work together for adaptive systems. | Provides fine-grained control over environment-specific styling. |
+|  |  |  |
+
+<aside>
+💡
+
+### **Summary of What CSS Enables**
+
+- **Layout control:** Build complex, adaptive layouts (Grid, Flexbox, Container Queries).
+- **Theming:** Use variables, `prefers-color-scheme`, and logical props for design consistency.
+- **Animation:** Create performant transitions and motion systems without JS.
+- **Scalability:** Manage huge stylebases via Cascade Layers, BEM, and modular architecture.
+- **Performance:** Use containment, content-visibility, and hardware-accelerated transforms.
+- **Accessibility:** Respond to user preferences for contrast, motion, and color.
+- **Extensibility:** Extend CSS via Houdini and integrate seamlessly with Web Components.
+</aside>
+
+<aside>
+💡
+
+**Optimization Strategy:**
+
+- Prefer classes over complex descendant selectors
+- Avoid universal selectors in performance-critical contexts
+- Keep selector depth under 3-4 levels
+</aside>
