@@ -4,6 +4,8 @@ import { getCollection } from "astro:content";
 import Layout from "@/layouts/layout.astro";
 import Section from "@/components/layout/section.astro";
 import TableOfContent from "@/components/ui/table-of-content.astro";
+import { ChevronRight } from "@lucide/astro";
+import Badge from "@/components/ui/badge.astro";
 
 export async function getStaticPaths() {
   const entries: CollectionEntry<"docs">[] = await getCollection(
@@ -22,24 +24,33 @@ const { Content, headings } = await entry.render();
 ---
 
 <Layout title={entry.data.title}>
+  <nav class="flex items-center gap-2 text-sm text-muted-foreground mt-6">
+    <a href="/docs" class="hover:text-foreground transition-colors">Documentation</a>
+    <ChevronRight class="w-3.5 h-3.5" />
+    <span class="text-foreground">{entry.data.technology}</span>
+  </nav>
   <Section>
-  <article class="mx-auto px-6">
-    <header class="pb-6 md:pb-12 border-b border-border">
-      <h1 class="heading-page mb-4">{entry.data.title}</h1>
-      <p class="body-large">{entry.data.description}</p>
-    </header>
-    <div class="grid lg:grid-cols-[1fr_280px] gap-8 lg:gap-12 mt-6 md:mt-12">
-      <div class="prose max-w-none w-full">
-        <Content />
+    <article class="mx-auto px-6">
+      <header class="pb-6 md:pb-12 border-b border-border flex flex-col">
+        <h1 class="heading-page mb-4 order-1">{entry.data.title}</h1>
+        <Badge class="mb-2 order-0" variant="secondary" size="sm">
+          <span class="sr-only">Category: </span>
+          {entry.data.technology}
+        </Badge>
+        <p class="body-large order-2">{entry.data.description}</p>
+      </header>
+      <div class="grid lg:grid-cols-[1fr_280px] gap-8 lg:gap-12 mt-6 md:mt-12">
+        <div class="prose max-w-none w-full">
+          <Content />
+        </div>
+        {
+          headings.length > 1 && (
+            <aside class="hidden lg:block">
+              <TableOfContent headings={headings} />
+            </aside>
+          )
+        }
       </div>
-      {
-        headings.length > 1 && (
-          <aside class="hidden lg:block">
-            <TableOfContent headings={headings} />
-          </aside>
-        )
-      }
-    </div>
-  </article>
+    </article>
   </Section>
 </Layout>
