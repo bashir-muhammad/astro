@@ -5,6 +5,10 @@ import mdx from "@astrojs/mdx";
 
 // https://astro.build/config
 export default defineConfig({
+  prefetch: {
+    prefetchAll: true,
+    defaultStrategy: "hover",
+  },
   image: {
     service: {
       entrypoint: "astro/assets/services/sharp",
