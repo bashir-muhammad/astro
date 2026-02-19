@@ -9,22 +9,19 @@ import Badge from "@/components/ui/badge.astro";
 import Button from "@/components/ui/button.astro";
 
 export async function getStaticPaths() {
-  const entries: CollectionEntry<"docs">[] = await getCollection(
-    "docs",
-    ({ data }) => !data.draft,
-  );
+  const allDocs: CollectionEntry<"docs">[] = await getCollection("docs");
+  const entries = allDocs.filter(({ data }) => !data.draft);
 
   return entries.map((entry) => ({
     params: { slug: entry.slug },
-    props: { entry },
+    props: { entry, allDocs },
   }));
 }
 
-const { entry } = Astro.props as { entry: CollectionEntry<"docs"> };
+const { entry, allDocs } = Astro.props as { entry: CollectionEntry<"docs">; allDocs: CollectionEntry<"docs">[] };
 const { Content, headings } = await entry.render();
 const technology = entry.data.technology;
 const pageTitle = entry.data.title;
-const allDocs: CollectionEntry<"docs">[] = await getCollection("docs");
 const categories = allDocs.filter((doc) => doc.data.technology === technology);
 ---
 
