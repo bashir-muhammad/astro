@@ -1,6 +1,7 @@
 ---
 import { Image } from "astro:assets";
 import { navItems } from "@/lib/navigation";
+import Container from "./container.astro";
 
 const currentPath = Astro.url.pathname;
 
@@ -13,7 +14,7 @@ function isActive(href: string): boolean {
 <header
   class="site-header py-2 sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 [container-type:scroll-state] [container-name:site-header]"
 >
-  <div class="header-content mx-auto h-16 flex items-center justify-between">
+  <Container class="header-content h-16 flex items-center justify-between">
     <a href="/" class="flex items-center gap-2 font-semibold text-lg" data-astro-prefetch>
       <Image
         src="/images/astro-logo.png"
@@ -43,5 +44,5 @@ function isActive(href: string): boolean {
         </a>
       ))}
     </nav>
-  </div>
+  </Container>
 </header>
