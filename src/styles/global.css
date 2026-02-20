@@ -203,7 +203,16 @@
     @apply prose-a:text-accent prose-a:no-underline hover:prose-a:underline;
     @apply prose-strong:text-foreground prose-strong:font-semibold;
     @apply prose-code:text-accent prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded;
-    @apply prose-pre:bg-muted prose-pre:border prose-pre:border-border;
+    @apply prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-pre:overflow-x-auto prose-pre:max-w-full;
+  }
+
+  /* Responsive code blocks */
+  pre {
+    @apply overflow-x-auto max-w-full;
+  }
+
+  pre code {
+    @apply block w-max min-w-full;
   }
 }
 
