@@ -48,12 +48,12 @@ const categories = allDocs.filter((doc) => doc.data.technology === technology);
           <p class="body-large order-2">{entry.data.description}</p>
         </header>
         <div
-          class="grid xl:grid-cols-[1fr_280px] gap-8 lg:gap-12 mt-6 md:mt-12"
+          class="grid 2xl:grid-cols-[1fr_280px] gap-8 lg:gap-12 mt-6 md:mt-12"
         >
           {
             headings.length > 1 && (
               <nav
-                class="hidden xl:block order-last"
+                class="hidden 2xl:block order-last"
                 aria-label="Table of Contents"
               >
                 <TableOfContent headings={headings} />
