@@ -7,6 +7,7 @@ import { getReadingTime } from "@/lib/utils";
 import Layout from "@/layouts/layout.astro";
 import Badge from "@/components/ui/badge.astro";
 import TableOfContent from "@/components/ui/table-of-content.astro";
+import Section from "@/components/layout/section.astro";
 
 export async function getStaticPaths() {
   const blogCollection: CollectionEntry<"blogs">[] =
@@ -23,6 +24,7 @@ const readingTime = getReadingTime(entry.body);
 ---
 
 <Layout title={entry.data.title}>
+  <Section>
   <article>
     <header class="mx-auto pb-6 md:pb-12 border-b">
       <h1 class="heading-page mb-6">{entry.data.title}</h1>
@@ -85,4 +87,5 @@ const readingTime = getReadingTime(entry.body);
       }
     </div>
   </article>
+  </Section>
 </Layout>

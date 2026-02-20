@@ -1,0 +1,4242 @@
+---
+title: "Comprehensive Guide to Next.js"
+description: "A deep dive into Next.js, covering core concepts, architecture, and best practices."
+technology: "next.js"
+category: "guides"
+order: 6
+lastUpdated: 2024-01-10
+authors: ["john-doe"]
+tags: ["next.js", "guides", "architecture", "best practices"]
+---
+
+# SECTION 1: CORE CONCEPTS & ARCHITECTURE
+
+## Understanding Rendering: RSC vs SSR vs Static vs Dynamic
+
+This is foundational—understanding these concepts deeply will make every other Next.js feature click into place.
+
+### The Evolution: Why RSC Matters
+
+**Traditional SPA (React)**
+- Browser downloads entire JavaScript bundle
+- All rendering happens on client
+- Problem: Large JS bundles, slow initial page load, SEO challenges
+
+**SSR (First Solution)**
+- Server renders full HTML on request
+- Browser receives HTML + JavaScript
+- Browser then hydrates (makes interactive)
+- Problem: Large JavaScript bundles still needed, page isn’t interactive until hydration completes
+
+**RSC (Modern Solution - What Next.js Uses)**
+- Server renders components, sends HTML + interactive client bundles
+- Can render some components ONLY on server (zero JavaScript)
+- Only send JavaScript for truly interactive components
+- Much smaller bundles
+
+### React Server Components (RSC) - Deep Dive
+
+**What Makes RSC Different?**
+
+Server Components:
+
+```jsx
+// app/dashboard/page.js
+// This is a Server Component by default (no 'use client')
+
+export default async function DashboardPage() {
+  // ✅ Direct database access - no API needed
+  const user = await db.users.findOne({ id: userId })
+
+  // ✅ Access secrets safely - never exposed to browser
+  const apiKey = process.env.STRIPE_SECRET_KEY
+
+  // ✅ Keep expensive logic server-side
+  const encryptedData = await encrypt(sensitiveInfo)
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      {/* Server Component can render other Server Components */}
+      <UserStats userId={user.id} />
+    </div>
+  )
+}
+```
+
+What Server Components CAN’T do:
+
+```jsx
+export default async function Page() {
+  // ❌ Cannot use browser APIs
+  const windowHeight = window.innerHeight
+
+  // ❌ Cannot use hooks (useState, useEffect, etc.)
+  const [count, setCount] = useState(0)
+
+  // ❌ Cannot use event listeners
+  const handleClick = () => { /* ... */ }
+
+  // ❌ Cannot use browser storage
+  const data = localStorage.getItem('key')
+}
+```
+
+**Key Insight**: Server Components can fetch data at the component level without prop drilling:
+
+```jsx
+// app/dashboard/layout.js - Server Component
+async function getUserStats(userId) {
+  return await db.stats.find({ userId })
+}
+
+async function getUserNotifications(userId) {
+  return await db.notifications.find({ userId })
+}
+
+export default async function DashboardLayout({ children, userId }) {
+  // Each component fetches what it needs - these requests are memoized!
+  const stats = await getUserStats(userId)
+  const notifications = await getUserNotifications(userId)
+
+  // Even if 3 child components also request this data, it fetches once
+  return (
+    <div>
+      <Sidebar stats={stats} />
+      <NotificationCenter notifications={notifications} />
+      {children}
+    </div>
+  )
+}
+```
+
+### Client Components - When You Need Them
+
+```jsx
+// app/components/InteractiveCounter.jsx
+'use client'  // This directive marks it as a Client Component
+
+import { useState, useEffect } from 'react'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+
+  // ✅ Can use hooks
+  useEffect(() => {
+    console.log('Counter updated:', count)
+  }, [count])
+
+  // ✅ Can use event listeners
+  const handleClick = () => setCount(count + 1)
+
+  // ✅ Can access browser APIs
+  const screenWidth = window.innerWidth
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={handleClick}>Increment</button>
+    </div>
+  )
+}
+```
+
+**Important**: Client Components can have Server Component children:
+
+```jsx
+// app/page.js - Server Component
+import InteractiveSection from './components/InteractiveSection'
+import ExpensiveDataComponent from './components/ExpensiveDataComponent'
+
+export default async function Page() {
+  const data = await fetch('/api/expensive-data')
+
+  return (
+    <InteractiveSection>
+      {/* This Server Component is a child of Client Component */}
+      {/* The data fetch doesn't get sent to browser! */}
+      <ExpensiveDataComponent data={data} />
+    </InteractiveSection>
+  )
+}
+```
+
+This is powerful: Client Components handle interactivity, but Server Components handle expensive operations.
+
+### Rendering Strategies Explained
+
+**Static Rendering (Default)**
+
+How it works:
+1. At build time (`npm run build`), Next.js renders your routes to static HTML
+2. HTML is cached and reused for every user
+3. Zero server computation needed on requests
+
+When to use:
+
+```jsx
+// ✅ Blog posts - content doesn't change per request
+export default function BlogPost({ params }) {
+  // This data is the same for all users
+  const post = staticBlogPosts[params.slug]
+  return<article>{post.content}</article>
+}
+
+// ✅ Product catalog pages
+export default function ProductPage({ params }) {
+  const product = allProducts[params.id]
+  return<div>{product.name}</div>
+}
+
+// ✅ Marketing pages
+export default function PricingPage() {
+  return<div>Our pricing is $99/month</div>
+}
+```
+
+**Dynamic Rendering**
+
+When Next.js switches from static to dynamic:
+
+```jsx
+// ❌ This causes dynamic rendering - re-renders on every request
+import { cookies } from 'next/headers'
+
+export default async function Page() {
+  // ❌ Accessing cookies forces dynamic rendering
+  const userPreferences = cookies().get('theme')
+
+  // ❌ Accessing headers forces dynamic rendering
+  const userAgent = headers().get('user-agent')
+
+  // ❌ Using dynamic functions forces dynamic rendering
+  const currentTime = new Date()
+
+  return<div>{currentTime.toISOString()}</div>
+}
+```
+
+Real-world dynamic rendering example:
+
+```jsx
+// app/dashboard/page.js
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export default async function DashboardPage() {
+  // This forces dynamic rendering, which is correct!
+  // Because each user needs different data
+  const session = await getSession(cookies())
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  // Fetch user-specific data
+  const userDashboard = await db.dashboards.findOne({
+    userId: session.userId
+  })
+
+  return (
+    <div>
+      <h1>Welcome, {session.userName}</h1>
+      <DashboardContent data={userDashboard} />
+    </div>
+  )
+}
+```
+
+**When Performance Matters Most:**
+
+Static is fast because:
+- 0ms computation time (pre-rendered HTML)
+- Can be cached at CDN edge
+- Instant delivery worldwide
+
+Dynamic can be slow if:
+- You have 3+ database queries
+- Each query takes 100ms
+- Total page render is 300ms+ per user
+
+**Partial Static Generation (ISR)**
+
+```jsx
+// Some data is static, some is dynamic
+export const revalidate = 3600 // Revalidate every hour
+
+export default async function Page({ params }) {
+  // This data is cached for 1 hour, then refreshed
+  const product = await db.products.findOne({ id: params.id })
+
+  // This is always fresh (but should be fast)
+  const userCart = await getCurrentUserCart()
+
+  return (
+    <div>
+      <ProductInfo product={product} />
+      <Cart items={userCart} />
+    </div>
+  )
+}
+```
+
+---
+
+## Data Fetching: The Deep Dive
+
+This is where most Next.js confusion starts. Let’s build understanding step by step.
+
+### The Problem: Request Waterfall
+
+Imagine you’re building a dashboard:
+
+```jsx
+// ❌ WATERFALL PATTERN - Bad Performance
+export default async function Dashboard() {
+  // 1. First, get user (takes 100ms)
+  const user = await getUser()
+
+  // 2. THEN, get their projects (takes 100ms)
+  // Can't start until step 1 finishes
+  const projects = await getProjects(user.id)
+
+  // 3. THEN, get stats (takes 100ms)
+  // Can't start until step 2 finishes
+  const stats = await getStats(user.id)
+
+  // Total time: 300ms
+  // User sees blank page for 300ms
+
+  return (
+    <div>
+      <UserHeader user={user} />
+      <ProjectList projects={projects} />
+      <StatsPanel stats={stats} />
+    </div>
+  )
+}
+```
+
+Why this happens:
+
+```jsx
+const user = await getUser()
+// ↓ getUser must complete before next line
+const projects = await getProjects(user.id)
+// ↓ getProjects must complete before next line
+const stats = await getStats(user.id)
+```
+
+### The Solution: Parallel Fetching
+
+```jsx
+// ✅ PARALLEL FETCHING - Good Performance
+export default async function Dashboard() {
+  // 1. Start all requests at once (don't await yet)
+  const userPromise = getUser()
+  const projectsPromise = getProjects(userId)
+  const statsPromise = getStats(userId)
+
+  // 2. Then wait for all to complete
+  // Total time: 100ms (the slowest request)
+  const [user, projects, stats] = await Promise.all([
+    userPromise,
+    projectsPromise,
+    statsPromise,
+  ])
+
+  return (
+    <div>
+      <UserHeader user={user} />
+      <ProjectList projects={projects} />
+      <StatsPanel stats={stats} />
+    </div>
+  )
+}
+```
+
+**Real difference:**
+- Waterfall: 300ms (requests run sequentially)
+- Parallel: 100ms (requests run simultaneously)
+
+### Handling Dependent Data
+
+Sometimes data depends on other data:
+
+```jsx
+// ✅ This is correct - data is dependent
+export default async function UserProfile({ params }) {
+  // 1. Get user first (must do this)
+  const user = await db.users.findOne({ id: params.userId })
+
+  // 2. Can only get user's posts after we have user.id
+  const posts = await db.posts.find({ authorId: user.id })
+
+  return (
+    <div>
+      <UserInfo user={user} />
+      <PostList posts={posts} />
+    </div>
+  )
+}
+```
+
+But consider using Server Components to split work:
+
+```jsx
+// app/profile/layout.js
+async function getUserData(userId) {
+  return await db.users.findOne({ id: userId })
+}
+
+export default async function ProfileLayout({ children, params }) {
+  const user = await getUserData(params.userId)
+
+  return (
+    <div>
+      <Sidebar user={user} />
+      {children}
+    </div>
+  )
+}
+
+// app/profile/posts/page.js - This can fetch posts independently
+export default async function PostsPage({ params }) {
+  // By having this in a child component, Suspense can show loading
+  // for this section while other parts load
+  const posts = await db.posts.find({ authorId: params.userId })
+
+  return<PostList posts={posts} />
+}
+```
+
+### Memoization: Automatic Deduplication
+
+Next.js automatically prevents duplicate fetches:
+
+```jsx
+// app/dashboard/layout.js
+export default async function DashboardLayout({ children }) {
+  // This fetches user once
+  const user = await getUser()
+
+  return (
+    <div>
+      <Header user={user} />
+      {children}
+    </div>
+  )
+}
+
+// app/dashboard/stats/page.js
+export default async function StatsPage() {
+  // This request DOES NOT cause another fetch!
+  // It reuses the result from layout
+  const user = await getUser()
+
+  return<div>{user.name}'s Stats</div>
+}
+
+// app/dashboard/settings/page.js
+export default async function SettingsPage() {
+  // Again, reuses the cached result
+  const user = await getUser()
+
+  return<div>{user.name}'s Settings</div>
+}
+```
+
+The `getUser()` function only executes ONCE during the render phase, even though it’s called three times.
+
+### Fetch Caching vs Data Revalidation
+
+```jsx
+// By default, fetches are cached indefinitely
+const data = await fetch('https://api.example.com/products')
+
+// Strategy 1: Revalidate after X seconds (ISR)
+const data = await fetch('https://api.example.com/products', {
+  next: { revalidate: 60 } // Cache for 60 seconds
+})
+
+// Strategy 2: Tag-based revalidation (more flexible)
+const data = await fetch('https://api.example.com/products', {
+  next: { tags: ['products'] }
+})
+```
+
+**Real-world example: E-commerce Product Page**
+
+```jsx
+// app/products/[id]/page.js
+import { revalidateTag } from 'next/cache'
+
+export const revalidate = 3600 // HTML cached for 1 hour
+
+export default async function ProductPage({ params }) {
+  // Product info changes rarely - cached for 1 hour
+  const product = await fetch(
+    `https://api.example.com/products/${params.id}`,
+    { next: { tags: ['products', `product-${params.id}`] } }
+  ).then(r => r.json())
+
+  // Inventory changes frequently - revalidate every minute
+  const inventory = await fetch(
+    `https://api.example.com/inventory/${params.id}`,
+    { next: { revalidate: 60 } }
+  ).then(r => r.json())
+
+  // Reviews are user-specific - always fresh
+  const reviews = await fetch(
+    `https://api.example.com/products/${params.id}/reviews`,
+    { next: { revalidate: 0 } } // Always fresh
+  ).then(r => r.json())
+
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>In Stock: {inventory.quantity}</p>
+      <Reviews data={reviews} />
+    </div>
+  )
+}
+
+// When inventory updates, trigger revalidation
+export async function updateInventory(productId) {
+  await db.inventory.update(productId, {...})
+
+  // This revalidates the cached page
+  revalidateTag(`product-${productId}`)
+}
+```
+
+---
+
+# SECTION 2: ROUTING & FILE STRUCTURE
+
+## Understanding the File-System Router
+
+### Mental Model: Folders = URLs
+
+```
+app/
+  page.js                    → /
+  about/
+    page.js                  → /about
+  blog/
+    page.js                  → /blog
+    [slug]/
+      page.js                → /blog/hello-world
+                             → /blog/my-post
+  dashboard/
+    layout.js
+    page.js                  → /dashboard
+    settings/
+      page.js                → /dashboard/settings
+    analytics/
+      page.js                → /dashboard/analytics
+```
+
+**Key insight**: Each `page.js` makes that route publicly accessible. Anything else is private.
+
+### The Power of Colocating Components
+
+```
+app/
+  dashboard/
+    page.js                  (publicly accessible)
+    _components/
+      StatsCard.js           (not routable - can colocate)
+      Chart.js               (not routable)
+    _hooks/
+      useUserData.js         (not routable)
+    _utils/
+      formatCurrency.js      (not routable)
+```
+
+Instead of:
+
+```
+app/
+  dashboard/
+    page.js
+components/
+  dashboard/
+    StatsCard.js
+hooks/
+  dashboard/
+    useUserData.js
+utils/
+  dashboard/
+    formatCurrency.js
+```
+
+Benefits:
+- Everything related to dashboard stays together
+- Easy to delete entire feature (just delete the folder)
+- Clearer what’s used where
+- Less prop drilling
+
+---
+
+## Dynamic Routes: The Complete Picture
+
+### Single Dynamic Segment
+
+```
+app/blog/[slug]/page.js
+```
+
+Matches: `/blog/hello-world`, `/blog/my-post`, etc.
+
+```jsx
+export default function BlogPost({ params }) {
+  const { slug } = params
+  // slug === "hello-world"
+
+  return <h1>Post: {slug}</h1>
+}
+```
+
+### Multiple Dynamic Segments
+
+```
+app/[category]/[productId]/page.js
+```
+
+Matches: `/electronics/iphone`, `/books/1984`, etc.
+
+```jsx
+export default function ProductPage({ params }) {
+  const { category, productId } = params
+
+  return (
+    <div>
+      <p>Category: {category}</p>
+      <p>Product ID: {productId}</p>
+    </div>
+  )
+}
+```
+
+### Catch-All Segments
+
+```
+app/docs/[...slug]/page.js
+```
+
+Matches: `/docs/getting-started`, `/docs/api/reference/fetch`, etc.
+
+```jsx
+export default function DocsPage({ params }) {
+  const { slug } = params
+  // slug is an array!
+  // /docs/getting-started → slug = ["getting-started"]
+  // /docs/api/reference/fetch → slug = ["api", "reference", "fetch"]
+
+  return <h1>Docs: {slug.join(' / ')}</h1>
+}
+```
+
+**Common use case: Breadcrumb navigation**
+
+```jsx
+export default function DocsPage({ params }) {
+  const { slug = [] } = params
+
+  const breadcrumbs = [
+    { label: 'Home', href: '/docs' },
+    ...slug.map((segment, i) => ({
+      label: segment.charAt(0).toUpperCase() + segment.slice(1),
+      href: `/docs/${slug.slice(0, i + 1).join('/')}`
+    }))
+  ]
+
+  return (
+    <div>
+      <nav>
+        {breadcrumbs.map((crumb, i) => (
+          <span key={i}>
+            <a href={crumb.href}>{crumb.label}</a>
+            {i < breadcrumbs.length - 1 && ' / '}
+          </span>
+        ))}
+      </nav>
+    </div>
+  )
+}
+```
+
+### Optional Catch-All Segments
+
+```
+app/search/[[...query]]/page.js
+```
+
+Matches: `/search`, `/search/nextjs`, `/search/nextjs/tutorial`, etc.
+
+```jsx
+export default function SearchPage({ params }) {
+  const { query = [] } = params
+
+  if (query.length === 0) {
+    return <h1>Enter a search term</h1>
+  }
+
+  return <h1>Results for: {query.join(' ')}</h1>
+}
+```
+
+---
+
+## Route Groups: Organizing Without Affecting URLs
+
+Route groups let you organize code without changing URL structure.
+
+### Problem: Multiple Navigation Structures
+
+You want:
+- `/` landing page with marketing layout
+- `/dashboard` with admin layout
+- Both can’t share the same root layout
+
+### Solution: Route Groups
+
+```
+app/
+  (marketing)/
+    layout.js              (marketing layout)
+    page.js                → /
+    about/
+      page.js              → /about
+    pricing/
+      page.js              → /pricing
+  (dashboard)/
+    layout.js              (admin layout)
+    page.js                → /dashboard
+    settings/
+      page.js              → /dashboard/settings
+    analytics/
+      page.js              → /dashboard/analytics
+```
+
+Marketing layout:
+
+```jsx
+// app/(marketing)/layout.js
+export default function MarketingLayout({ children }) {
+  return (
+    <div>
+      <MarketingHeader />
+      <main>{children}</main>
+      <MarketingFooter />
+    </div>
+  )
+}
+```
+
+Admin layout:
+
+```jsx
+// app/(dashboard)/layout.js
+export default function DashboardLayout({ children }) {
+  return (
+    <div className="flex">
+      <Sidebar />
+      <main>{children}</main>
+    </div>
+  )
+}
+```
+
+URLs are NOT affected:
+- `/` (not `/(marketing)/`)
+- `/dashboard` (not `/(dashboard)/`)
+
+### Private Folders: Hide Implementation Details
+
+```
+app/
+  _lib/
+    db.js                  (not routable)
+    auth.js
+    email.js
+  _components/
+    Header.js              (not routable)
+    Footer.js
+  dashboard/
+    page.js                → /dashboard
+```
+
+Why useful:
+- Signals to team these aren’t routes
+- Keeps utilities separate from routes
+- Can safely reorganize without affecting URLs
+
+---
+
+## Layouts: Shared UI Without Re-renders
+
+### The Layout Pattern
+
+```jsx
+// app/layout.js (Root Layout - REQUIRED)
+export const metadata = {
+  title: 'My App',
+}
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <Header />
+        {children}
+        <Footer />
+      </body>
+    </html>
+  )
+}
+```
+
+When you navigate between routes, the layout stays mounted and interactive:
+
+```
+GET /dashboard     → <RootLayout><Dashboard /></RootLayout>
+                     (Header, Footer stay mounted)
+Navigate to /dashboard/settings
+                   → <RootLayout><DashboardSettings /></RootLayout>
+                     (Header, Footer are REUSED, not re-rendered)
+```
+
+### Nested Layouts
+
+Each route segment can have its own layout:
+
+```
+app/
+  layout.js                    (Root)
+  dashboard/
+    layout.js                  (Dashboard)
+    page.js
+    settings/
+      layout.js                (Settings)
+      page.js
+```
+
+```jsx
+// app/dashboard/layout.js
+export default function DashboardLayout({ children }) {
+  return (
+    <div className="dashboard-container">
+      <DashboardSidebar />
+      <main>{children}</main>
+    </div>
+  )
+}
+
+// app/dashboard/settings/layout.js
+export default function SettingsLayout({ children }) {
+  return (
+    <div>
+      <SettingsTabs />
+      <div className="settings-content">
+        {children}
+      </div>
+    </div>
+  )
+}
+```
+
+When you visit `/dashboard/settings`:
+
+```
+<RootLayout>
+  <DashboardLayout>
+    <SettingsLayout>
+      <SettingsPage />
+    </SettingsLayout>
+  </DashboardLayout>
+</RootLayout>
+```
+
+### Templates: Re-mounting on Navigation
+
+Templates are like layouts, but they remount on every navigation:
+
+```jsx
+// app/template.js
+'use client'
+
+import { useEffect, useState } from 'react'
+
+export default function Template({ children }) {
+  const [isAnimating, setIsAnimating] = useState(true)
+
+  useEffect(() => {
+    // This runs every time user navigates
+    setIsAnimating(true)
+    const timer = setTimeout(() => setIsAnimating(false), 300)
+    return () => clearTimeout(timer)
+  }, [])
+
+  return (
+    <div className={isAnimating ? 'fade-in' : ''}>
+      {children}
+    </div>
+  )
+}
+```
+
+**When to use Template:**
+- Enter/exit animations
+- useEffect should run on every page change
+- Reset form state between pages
+- Reset scroll position
+
+**Layout vs Template:**
+
+```jsx
+// LAYOUT - persists state
+export default function Layout({ children }) {
+  const [savedDraft, setSavedDraft] = useState('')
+
+  return (
+    <div>
+      <AutoSaveDraft value={savedDraft} onChange={setSavedDraft} />
+      {children}
+    </div>
+  )
+}
+// Navigate between pages → savedDraft is preserved
+
+// TEMPLATE - resets state
+export default function Template({ children }) {
+  const [unsavedDraft, setUnsavedDraft] = useState('')
+
+  return (
+    <div>
+      <Form value={unsavedDraft} onChange={setUnsavedDraft} />
+      {children}
+    </div>
+  )
+}
+// Navigate between pages → unsavedDraft is cleared
+```
+
+---
+
+# SECTION 3: FORMS & SERVER ACTIONS
+
+## Server Actions: Rethinking Form Submission
+
+Server Actions replace the traditional REST API pattern for most form handling.
+
+### The Traditional Way (Still Works)
+
+```jsx
+// 1. Create API route
+// app/api/subscribe/route.js
+export async function POST(request) {
+  const { email } = await request.json()
+
+  // Validate email
+  if (!email.includes('@')) {
+    return Response.json({ error: 'Invalid email' }, { status: 400 })
+  }
+
+  // Save to database
+  await db.subscribers.create({ email })
+
+  return Response.json({ success: true })
+}
+
+// 2. Create form component
+// app/components/Newsletter.jsx
+'use client'
+
+import { useState } from 'react'
+
+export default function Newsletter() {
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+
+      if (!res.ok) throw new Error('Failed to subscribe')
+
+      setEmail('')
+      alert('Subscribed!')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <button disabled={loading}>{loading ? 'Loading...' : 'Subscribe'}</button>
+      {error &&<p>{error}</p>}
+    </form>
+  )
+}
+```
+
+**Problems with this approach:**
+- Boilerplate: need API route + client component + fetch logic
+- Network overhead: email string sent as JSON over network
+- Complexity: manual loading/error states
+
+### The Server Actions Way (Better)
+
+```jsx
+// app/actions/newsletter.js
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function subscribeToNewsletter(email) {
+  // Validation happens on server
+  if (!email.includes('@')) {
+    throw new Error('Invalid email')
+  }
+
+  // Direct database access
+  await db.subscribers.create({ email })
+
+  // Revalidate cache if needed
+  revalidatePath('/') // Regenerate static pages with new subscriber count
+}
+
+// app/components/Newsletter.jsx
+'use client'
+
+import { useState } from 'react'
+import { subscribeToNewsletter } from '@/app/actions/newsletter'
+
+export default function Newsletter() {
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      await subscribeToNewsletter(email)
+      setEmail('')
+      alert('Subscribed!')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <button disabled={loading}>{loading ? 'Loading...' : 'Subscribe'}</button>
+      {error &&<p>{error}</p>}
+    </form>
+  )
+}
+```
+
+**Benefits:**
+- Less code: single function, no API route needed
+- Type-safe: TypeScript can validate arguments
+- Direct database access: no serialization needed
+- Automatic form handling: works without JavaScript
+
+### Even Better: HTML Forms + Server Actions
+
+```jsx
+// app/components/Newsletter.jsx
+import { subscribeToNewsletter } from '@/app/actions/newsletter'
+
+export default function Newsletter() {
+  return (
+    <form action={subscribeToNewsletter}>
+      <input name="email" type="email" required />
+      <button type="submit">Subscribe</button>
+    </form>
+  )
+}
+```
+
+This form works even without JavaScript! The browser will:
+1. Submit form to server
+2. Run subscribeToNewsletter
+3. Redirect or show error
+
+When JavaScript loads, Next.js enhances the form with better UX (no full page reload).
+
+### Real-World Example: Todo App
+
+```jsx
+// app/actions/todos.js
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function addTodo(formData) {
+  const title = formData.get('title')
+
+  if (!title) throw new Error('Title required')
+
+  const todo = await db.todos.create({
+    title,
+    completed: false,
+    userId: await getCurrentUserId()
+  })
+
+  // Regenerate the page to show new todo
+  revalidatePath('/todos')
+
+  return todo
+}
+
+export async function toggleTodo(todoId) {
+  const todo = await db.todos.findOne({ id: todoId })
+
+  if (!todo) throw new Error('Todo not found')
+
+  await db.todos.update(todoId, {
+    completed: !todo.completed
+  })
+
+  revalidatePath('/todos')
+}
+
+export async function deleteTodo(todoId) {
+  await db.todos.deleteOne({ id: todoId })
+  revalidatePath('/todos')
+}
+
+// app/page.js (Server Component)
+import { Suspense } from 'react'
+import TodoForm from './components/TodoForm'
+import TodoList from './components/TodoList'
+
+export default function Page() {
+  return (
+    <div>
+      <TodoForm />
+      <Suspense fallback={<div>Loading todos...</div>}>
+        <TodoList />
+      </Suspense>
+    </div>
+  )
+}
+
+// app/components/TodoForm.jsx
+import { addTodo } from '@/app/actions/todos'
+
+export default function TodoForm() {
+  return (
+    <form action={addTodo}>
+      <input name="title" placeholder="Add a todo..." required />
+      <button type="submit">Add</button>
+    </form>
+  )
+}
+
+// app/components/TodoList.jsx
+import { toggleTodo, deleteTodo } from '@/app/actions/todos'
+
+async function getTodos() {
+  return await db.todos.find({ userId: await getCurrentUserId() })
+}
+
+export default async function TodoList() {
+  const todos = await getTodos()
+
+  return (
+    <ul>
+      {todos.map(todo => (
+        <li key={todo.id}>
+          <form action={async () => { 'use server'; await deleteTodo(todo.id) }}>
+            <button type="submit">Delete</button>
+          </form>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### Error Handling in Server Actions
+
+```jsx
+// app/actions/auth.js
+'use server'
+
+import { redirect } from 'next/navigation'
+
+export async function login(formData) {
+  const email = formData.get('email')
+  const password = formData.get('password')
+
+  // Validation errors
+  if (!email || !password) {
+    throw new Error('Email and password required')
+  }
+
+  // Custom validation
+  if (!email.includes('@')) {
+    throw new Error('Invalid email format')
+  }
+
+  // Authentication errors
+  const user = await db.users.findOne({ email })
+  if (!user) {
+    throw new Error('Invalid credentials')
+  }
+
+  const isPasswordValid = await verifyPassword(password, user.passwordHash)
+  if (!isPasswordValid) {
+    throw new Error('Invalid credentials')
+  }
+
+  // Set session
+  const session = await createSession(user.id)
+
+  // Redirect on success
+  redirect('/dashboard')
+}
+
+// app/components/LoginForm.jsx
+'use client'
+
+import { useState } from 'react'
+import { useFormStatus } from 'react-dom'
+import { login } from '@/app/actions/auth'
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button type="submit" disabled={pending}>
+      {pending ? 'Signing in...' : 'Sign In'}
+    </button>
+  )
+}
+
+export default function LoginForm() {
+  const [error, setError] = useState('')
+
+  async function handleSubmit(formData) {
+    try {
+      await login(formData)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  return (
+    <form action={handleSubmit}>
+      {error &&<p style={{ color: 'red' }}>{error}</p>}
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Password" required />
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+### Server Actions with Validation Libraries
+
+```jsx
+// app/actions/products.js
+'use server'
+
+import { z } from 'zod'
+import { revalidatePath } from 'next/cache'
+
+const createProductSchema = z.object({
+  name: z.string().min(1, 'Name required').max(100),
+  price: z.number().min(0.01),
+  description: z.string().max(1000),
+  category: z.enum(['electronics', 'books', 'clothing'])
+})
+
+export async function createProduct(formData) {
+  const rawData = {
+    name: formData.get('name'),
+    price: parseFloat(formData.get('price')),
+    description: formData.get('description'),
+    category: formData.get('category')
+  }
+
+  // Validate with zod
+  const validation = createProductSchema.safeParse(rawData)
+
+  if (!validation.success) {
+    // Return errors instead of throwing
+    return {
+      success: false,
+      errors: validation.error.flatten().fieldErrors
+    }
+  }
+
+  // If valid, proceed with database operation
+  try {
+    const product = await db.products.create(validation.data)
+    revalidatePath('/products')
+    return { success: true, product }
+  } catch (err) {
+    return { success: false, errors: { general: [err.message] } }
+  }
+}
+
+// app/components/ProductForm.jsx
+'use client'
+
+import { useState } from 'react'
+import { createProduct } from '@/app/actions/products'
+
+export default function ProductForm() {
+  const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(formData) {
+    setLoading(true)
+    setErrors({})
+
+    const result = await createProduct(formData)
+
+    if (!result.success) {
+      setErrors(result.errors)
+    } else {
+      alert('Product created!')
+    }
+
+    setLoading(false)
+  }
+
+  return (
+    <form action={handleSubmit}>
+      <div>
+        <input name="name" placeholder="Product name" required />
+        {errors.name &&<p style={{ color: 'red' }}>{errors.name[0]}</p>}
+      </div>
+
+      <div>
+        <input name="price" type="number" step="0.01" placeholder="Price" required />
+        {errors.price &&<p style={{ color: 'red' }}>{errors.price[0]}</p>}
+      </div>
+
+      <div>
+        <textarea name="description" placeholder="Description" />
+        {errors.description &&<p style={{ color: 'red' }}>{errors.description[0]}</p>}
+      </div>
+
+      <div>
+        <select name="category" required>
+          <option value="">Select category</option>
+          <option value="electronics">Electronics</option>
+          <option value="books">Books</option>
+          <option value="clothing">Clothing</option>
+        </select>
+        {errors.category &&<p style={{ color: 'red' }}>{errors.category[0]}</p>}
+      </div>
+
+      <button type="submit" disabled={loading}>
+        {loading ? 'Creating...' : 'Create Product'}
+      </button>
+    </form>
+  )
+}
+```
+
+---
+
+# SECTION 4: API ROUTES (ROUTE HANDLERS)
+
+## When to Use Route Handlers vs Server Actions
+
+**Use Server Actions when:**
+- Handling form submissions
+- Calling from Client Components
+- Doing simple mutations
+- Don’t need external API clients to access it
+
+**Use Route Handlers when:**
+- Building REST APIs for external consumption
+- Handling webhooks (Stripe, GitHub, etc.)
+- Need full control over request/response
+- Complex business logic
+- Third-party services need to access it
+
+### Basic Route Handler Structure
+
+```jsx
+// app/api/hello/route.js
+import { NextResponse } from 'next/server'
+
+// GET requests
+export async function GET(request) {
+  const { searchParams } = new URL(request.url)
+  const name = searchParams.get('name') || 'World'
+
+  return NextResponse.json({
+    message: `Hello,${name}!`
+  })
+}
+
+// POST requests
+export async function POST(request) {
+  const body = await request.json()
+
+  return NextResponse.json(
+    { message: 'Created', data: body },
+    { status: 201 }
+  )
+}
+
+// PUT/PATCH requests
+export async function PUT(request) {
+  const body = await request.json()
+
+  return NextResponse.json({
+    message: 'Updated',
+    data: body
+  })
+}
+
+// DELETE requests
+export async function DELETE(request) {
+  return NextResponse.json(
+    { message: 'Deleted' },
+    { status: 200 }
+  )
+}
+```
+
+### Dynamic Route Handlers
+
+```jsx
+// app/api/users/[id]/route.js
+export async function GET(request, { params }) {
+  const { id } = params
+
+  const user = await db.users.findOne({ id })
+
+  if (!user) {
+    return NextResponse.json(
+      { error: 'User not found' },
+      { status: 404 }
+    )
+  }
+
+  return NextResponse.json(user)
+}
+
+export async function PUT(request, { params }) {
+  const { id } = params
+  const body = await request.json()
+
+  try {
+    const user = await db.users.updateOne(
+      { id },
+      body
+    )
+
+    return NextResponse.json(user)
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to update user' },
+      { status: 400 }
+    )
+  }
+}
+
+export async function DELETE(request, { params }) {
+  const { id } = params
+
+  await db.users.deleteOne({ id })
+
+  return NextResponse.json(
+    { message: 'User deleted' },
+    { status: 204 }
+  )
+}
+```
+
+### Catch-All Route Handlers
+
+```jsx
+// app/api/files/[...slug]/route.js
+export async function GET(request, { params }) {
+  const { slug } = params
+  // slug = ['documents', 'reports', 'q1']
+
+  const filePath = slug.join('/')
+
+  const file = await storage.getFile(filePath)
+
+  if (!file) {
+    return NextResponse.json(
+      { error: 'File not found' },
+      { status: 404 }
+    )
+  }
+
+  return NextResponse.json(file)
+}
+```
+
+### Handling Different Content Types
+
+```jsx
+// app/api/upload/route.js
+export async function POST(request) {
+  const contentType = request.headers.get('content-type')
+
+  if (contentType?.includes('application/json')) {
+    const json = await request.json()
+    // Handle JSON
+    return NextResponse.json({ data: json })
+  }
+
+  if (contentType?.includes('multipart/form-data')) {
+    const formData = await request.formData()
+    const file = formData.get('file')
+
+    // Process file upload
+    const buffer = await file.arrayBuffer()
+    await saveFile(file.name, buffer)
+
+    return NextResponse.json({ success: true })
+  }
+
+  if (contentType?.includes('text/plain')) {
+    const text = await request.text()
+    // Handle text
+    return NextResponse.json({ text })
+  }
+
+  return NextResponse.json(
+    { error: 'Unsupported content type' },
+    { status: 415 }
+  )
+}
+```
+
+### Real-World Example: Blog API
+
+```jsx
+// app/api/posts/route.js
+import { NextResponse } from 'next/server'
+
+// GET /api/posts - list all posts
+export async function GET(request) {
+  const { searchParams } = new URL(request.url)
+  const page = parseInt(searchParams.get('page') || '1')
+  const limit = parseInt(searchParams.get('limit') || '10')
+
+  const posts = await db.posts
+    .find({ published: true })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .toArray()
+
+  const total = await db.posts.countDocuments({ published: true })
+
+  return NextResponse.json({
+    posts,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  })
+}
+
+// POST /api/posts - create new post
+export async function POST(request) {
+  const userId = await authenticateUser(request)
+
+  if (!userId) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
+  const { title, content, tags } = await request.json()
+
+  // Validation
+  if (!title || !content) {
+    return NextResponse.json(
+      { error: 'Title and content required' },
+      { status: 400 }
+    )
+  }
+
+  const post = await db.posts.insertOne({
+    title,
+    content,
+    tags: tags || [],
+    authorId: userId,
+    published: false,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  })
+
+  return NextResponse.json(post, { status: 201 })
+}
+
+// app/api/posts/[id]/route.js
+export async function GET(request, { params }) {
+  const post = await db.posts.findOne({ _id: params.id })
+
+  if (!post) {
+    return NextResponse.json(
+      { error: 'Post not found' },
+      { status: 404 }
+    )
+  }
+
+  return NextResponse.json(post)
+}
+
+export async function PATCH(request, { params }) {
+  const userId = await authenticateUser(request)
+  const post = await db.posts.findOne({ _id: params.id })
+
+  if (!post) {
+    return NextResponse.json(
+      { error: 'Post not found' },
+      { status: 404 }
+    )
+  }
+
+  if (post.authorId !== userId) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 403 }
+    )
+  }
+
+  const updates = await request.json()
+
+  const updatedPost = await db.posts.findOneAndUpdate(
+    { _id: params.id },
+    { $set: { ...updates, updatedAt: new Date() } },
+    { returnDocument: 'after' }
+  )
+
+  return NextResponse.json(updatedPost)
+}
+
+export async function DELETE(request, { params }) {
+  const userId = await authenticateUser(request)
+  const post = await db.posts.findOne({ _id: params.id })
+
+  if (!post) {
+    return NextResponse.json(
+      { error: 'Post not found' },
+      { status: 404 }
+    )
+  }
+
+  if (post.authorId !== userId) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 403 }
+    )
+  }
+
+  await db.posts.deleteOne({ _id: params.id })
+
+  return NextResponse.json({ message: 'Post deleted' })
+}
+```
+
+### Handling Webhooks
+
+```jsx
+// app/api/webhooks/stripe/route.js
+import { NextResponse } from 'next/server'
+import Stripe from 'stripe'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+
+export async function POST(request) {
+  const body = await request.text()
+  const signature = request.headers.get('stripe-signature')
+
+  let event
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      webhookSecret
+    )
+  } catch (error) {
+    console.error('Webhook signature verification failed', error.message)
+    return NextResponse.json(
+      { error: 'Invalid signature' },
+      { status: 400 }
+    )
+  }
+
+  // Handle different event types
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const paymentIntent = event.data.object
+      await db.orders.updateOne(
+        { stripePaymentId: paymentIntent.id },
+        { status: 'paid', paidAt: new Date() }
+      )
+      break
+
+    case 'charge.refunded':
+      const charge = event.data.object
+      await db.orders.updateOne(
+        { stripeChargeId: charge.id },
+        { status: 'refunded', refundedAt: new Date() }
+      )
+      break
+
+    case 'customer.subscription.updated':
+      const subscription = event.data.object
+      await db.subscriptions.updateOne(
+        { stripeSubscriptionId: subscription.id },
+        { status: subscription.status }
+      )
+      break
+
+    default:
+      console.log(`Unhandled event type:${event.type}`)
+  }
+
+  return NextResponse.json({ received: true })
+}
+```
+
+---
+
+# SECTION 5: STREAMING & LOADING STATES
+
+## The Streaming Pattern: Progressive Rendering
+
+Traditional SSR: User waits for entire page to render, then sees everything at once.
+
+Streaming: User sees parts of page as they’re ready.
+
+### Page-Level Loading State
+
+```jsx
+// app/dashboard/loading.js
+export default function DashboardLoading() {
+  return (
+    <div className="dashboard-skeleton">
+      <div className="skeleton-header" />
+      <div className="skeleton-cards">
+        <div className="skeleton-card" />
+        <div className="skeleton-card" />
+        <div className="skeleton-card" />
+      </div>
+    </div>
+  )
+}
+
+// app/dashboard/page.js
+export default async function Dashboard() {
+  // This might take 2 seconds
+  const data = await fetchExpensiveData()
+
+  return (
+    <div className="dashboard">
+      <header>Dashboard</header>
+      <Cards data={data} />
+    </div>
+  )
+}
+```
+
+When user visits `/dashboard`:
+1. Loading skeleton appears immediately
+2. While data fetches, user sees loading UI
+3. Once data ready, full page replaces skeleton
+
+### Component-Level Streaming with Suspense
+
+This is more powerful—stream individual components:
+
+```jsx
+// app/dashboard/page.js
+import { Suspense } from 'react'
+import { UserStats } from './components/UserStats'
+import { RecentActivity } from './components/RecentActivity'
+import { Recommendations } from './components/Recommendations'
+
+export default function Dashboard() {
+  return (
+    <div className="dashboard">
+      <h1>Dashboard</h1>
+
+      {/* Load fast, show immediately */}
+      <Suspense fallback={<div>Loading stats...</div>}>
+        <UserStats />
+      </Suspense>
+
+      {/* Load slower, show loading while fetching */}
+      <Suspense fallback={<div>Loading activity...</div>}>
+        <RecentActivity />
+      </Suspense>
+
+      {/* Slowest, loads last */}
+      <Suspense fallback={<div>Loading recommendations...</div>}>
+        <Recommendations />
+      </Suspense>
+    </div>
+  )
+}
+
+// Each component is independent and async
+// app/dashboard/components/UserStats.js
+async function UserStats() {
+  const stats = await db.stats.getUserStats() // takes 500ms
+
+  return (
+    <div className="stats-card">
+      <p>Total Views: {stats.views}</p>
+      <p>Engagement: {stats.engagement}%</p>
+    </div>
+  )
+}
+
+// app/dashboard/components/RecentActivity.js
+async function RecentActivity() {
+  const activity = await db.activity.getRecent() // takes 1 second
+
+  return (
+    <div className="activity-card">
+      {activity.map(item => (
+        <div key={item.id}>{item.description}</div>
+      ))}
+    </div>
+  )
+}
+
+// app/dashboard/components/Recommendations.js
+async function Recommendations() {
+  const recs = await db.ml.getRecommendations() // takes 3 seconds
+
+  return (
+    <div className="recommendations-card">
+      {recs.map(item => (
+        <div key={item.id}>{item.title}</div>
+      ))}
+    </div>
+  )
+}
+```
+
+**User Experience:**
+1. Page skeleton appears (50ms)
+2. Stats load (500ms) → stats component appears, others still loading
+3. Activity loads (1.5s total) → activity appears
+4. Recommendations load (4.5s total) → recommendations appear
+5. User had something to interact with the entire time!
+
+### Advanced Streaming: SEO-Friendly Product Page
+
+```jsx
+// app/products/[id]/page.js
+import { Suspense } from 'react'
+import { notFound } from 'next/navigation'
+
+// This is critical for SEO - load synchronously
+async function getProductMetadata(id) {
+  const product = await db.products.findOne({ id })
+  if (!product) notFound()
+  return product
+}
+
+export async function generateMetadata({ params }) {
+  const product = await getProductMetadata(params.id)
+
+  return {
+    title: product.name,
+    description: product.description,
+    openGraph: {
+      images: [product.image],
+      title: product.name,
+      description: product.description
+    }
+  }
+}
+
+export default async function ProductPage({ params }) {
+  const product = await getProductMetadata(params.id)
+
+  return (
+    <div>
+      {/* Critical content loads first */}
+      <ProductHeader product={product} />
+
+      {/* Secondary content streams in */}
+      <Suspense fallback={<div>Loading details...</div>}>
+        <ProductDetails productId={params.id} />
+      </Suspense>
+
+      {/* Interactive elements stream in */}
+      <Suspense fallback={<div>Loading reviews...</div>}>
+        <ReviewsSection productId={params.id} />
+      </Suspense>
+
+      {/* Related products can take time */}
+      <Suspense fallback={<div>Loading recommendations...</div>}>
+        <RelatedProducts category={product.category} />
+      </Suspense>
+    </div>
+  )
+}
+
+function ProductHeader({ product }) {
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <img src={product.image} alt={product.name} />
+      <p>${product.price}</p>
+    </div>
+  )
+}
+
+async function ProductDetails({ productId }) {
+  const details = await db.products.getDetails(productId)
+  return<div>{/* render details */}</div>
+}
+
+async function ReviewsSection({ productId }) {
+  const reviews = await db.reviews.find({ productId })
+  return<div>{/* render reviews */}</div>
+}
+
+async function RelatedProducts({ category }) {
+  const products = await db.products.findByCategory(category)
+  return<div>{/* render products */}</div>
+}
+```
+
+---
+
+# SECTION 6: SEARCH PARAMETERS & FILTERING
+
+## Advanced Search Implementation
+
+### Problem: Managing State Across Pages
+
+You want filters to persist when users:
+- Share URLs with others
+- Refresh the page
+- Use browser back/forward
+
+Solution: Store filter state in URL query params.
+
+### Multi-Filter Search with Search Params
+
+```jsx
+// app/products/page.js (Server Component)
+import { Suspense } from 'react'
+import ProductFilters from './components/ProductFilters'
+import ProductList from './components/ProductList'
+
+export default function ProductsPage({ searchParams }) {
+  // URL: /products?category=electronics&minPrice=100&maxPrice=500&sort=price
+  const {
+    category = '',
+    minPrice = '0',
+    maxPrice = '999999',
+    sort = 'name',
+    page = '1'
+  } = searchParams
+
+  return (
+    <div className="products-container">
+      <aside className="sidebar">
+        {/* Client component for interactive filters */}
+        <ProductFilters
+          initialCategory={category}
+          initialMinPrice={minPrice}
+          initialMaxPrice={maxPrice}
+          initialSort={sort}
+        />
+      </aside>
+
+      <main className="products-main">
+        {/* Pass search params to component that fetches */}
+        <Suspense fallback={<div>Loading products...</div>}>
+          <ProductList
+            category={category}
+            minPrice={parseFloat(minPrice)}
+            maxPrice={parseFloat(maxPrice)}
+            sort={sort}
+            page={parseInt(page)}
+          />
+        </Suspense>
+      </main>
+    </div>
+  )
+}
+
+// app/products/components/ProductList.jsx
+async function ProductList({ category, minPrice, maxPrice, sort, page }) {
+  const pageSize = 12
+  const skip = (page - 1) * pageSize
+
+  // Build query based on filters
+  let query = {}
+
+  if (category) query.category = category
+  if (minPrice > 0) query.price = { $gte: minPrice }
+  if (maxPrice < 999999) {
+    query.price = { ...query.price, $lte: maxPrice }
+  }
+
+  // Build sort
+  let sortQuery = {}
+  switch (sort) {
+    case 'price-asc':
+      sortQuery = { price: 1 }
+      break
+    case 'price-desc':
+      sortQuery = { price: -1 }
+      break
+    case 'newest':
+      sortQuery = { createdAt: -1 }
+      break
+    default:
+      sortQuery = { name: 1 }
+  }
+
+  // Fetch products
+  const products = await db.products
+    .find(query)
+    .sort(sortQuery)
+    .skip(skip)
+    .limit(pageSize)
+    .toArray()
+
+  const total = await db.products.countDocuments(query)
+  const pages = Math.ceil(total / pageSize)
+
+  return (
+    <div>
+      <p>Showing {products.length} of {total} products</p>
+
+      <div className="products-grid">
+        {products.map(product => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {pages > 1 && (
+        <div className="pagination">
+          {Array.from({ length: pages }, (_, i) => i + 1).map(p => (
+            <a
+              key={p}
+              href={`/products?page=${p}&category=${category}&minPrice=${minPrice}&maxPrice=${maxPrice}&sort=${sort}`}
+              className={p === page ? 'active' : ''}
+            >
+              {p}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// app/products/components/ProductFilters.jsx
+'use client'
+
+import { useSearchParams, usePathname, useRouter } from 'next/navigation'
+import { useCallback } from 'react'
+
+export default function ProductFilters({
+  initialCategory,
+  initialMinPrice,
+  initialMaxPrice,
+  initialSort
+}) {
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
+
+  const updateParams = useCallback((newParams) => {
+    const params = new URLSearchParams(searchParams)
+
+    Object.entries(newParams).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value)
+      } else {
+        params.delete(key)
+      }
+    })
+
+    router.push(`${pathname}?${params.toString()}`)
+  }, [searchParams, pathname, router])
+
+  const handleCategoryChange = (e) => {
+    updateParams({ category: e.target.value, page: '1' })
+  }
+
+  const handlePriceChange = (type, value) => {
+    updateParams({
+      [type === 'min' ? 'minPrice' : 'maxPrice']: value,
+      page: '1'
+    })
+  }
+
+  const handleSortChange = (e) => {
+    updateParams({ sort: e.target.value, page: '1' })
+  }
+
+  return (
+    <div className="filters">
+      <h3>Filters</h3>
+
+      <div className="filter-group">
+        <label>Category</label>
+        <select value={initialCategory} onChange={handleCategoryChange}>
+          <option value="">All Categories</option>
+          <option value="electronics">Electronics</option>
+          <option value="books">Books</option>
+          <option value="clothing">Clothing</option>
+        </select>
+      </div>
+
+      <div className="filter-group">
+        <label>Min Price</label>
+        <input
+          type="number"
+          value={initialMinPrice}
+          onChange={(e) => handlePriceChange('min', e.target.value)}
+          min="0"
+        />
+      </div>
+
+      <div className="filter-group">
+        <label>Max Price</label>
+        <input
+          type="number"
+          value={initialMaxPrice}
+          onChange={(e) => handlePriceChange('max', e.target.value)}
+          min="0"
+        />
+      </div>
+
+      <div className="filter-group">
+        <label>Sort By</label>
+        <select value={initialSort} onChange={handleSortChange}>
+          <option value="name">Name</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="newest">Newest First</option>
+        </select>
+      </div>
+    </div>
+  )
+}
+```
+
+---
+
+# SECTION 7: MIDDLEWARE & EDGE FUNCTIONS
+
+## Middleware: Running Code at the Edge
+
+Middleware runs before any request reaches your Next.js app, on Vercel’s edge network (geographically distributed).
+
+### Authentication Middleware
+
+```jsx
+// middleware.js
+import { NextResponse } from 'next/server'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
+
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, '1 h'), // 10 requests per hour
+})
+
+export async function middleware(request: NextRequest) {
+  // Rate limit API routes
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    const ip = request.ip || 'unknown'
+    const { success } = await ratelimit.limit(ip)
+
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded' },
+        { status: 429 }
+      )
+    }
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: ['/api/:path*']
+}
+```
+
+### A/B Testing with Middleware
+
+```jsx
+// middleware.js
+import { NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Only run on product page
+  if (!pathname.startsWith('/products')) {
+    return NextResponse.next()
+  }
+
+  // Check if user already has a variant assigned
+  let variant = request.cookies.get('ab-variant')?.value
+
+  if (!variant) {
+    // Randomly assign variant
+    variant = Math.random() > 0.5 ? 'control' : 'treatment'
+
+    const response = NextResponse.next()
+    response.cookies.set('ab-variant', variant, { maxAge: 60 * 60 * 24 * 30 })
+    return response
+  }
+
+  return NextResponse.next()
+}
+```
+
+Then in your component:
+
+```jsx
+// app/products/page.js
+import { cookies } from 'next/headers'
+
+export default function ProductsPage() {
+  const variant = cookies().get('ab-variant')?.value || 'control'
+
+  if (variant === 'treatment') {
+    return<ProductsPageNew />
+  }
+
+  return<ProductsPageControl />
+}
+```
+
+### Rewrites with Middleware
+
+```jsx
+// middleware.js
+import { NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Rewrite /old-path to /new-path without redirecting
+  if (pathname.startsWith('/old-path')) {
+    return NextResponse.rewrite(
+      new URL(pathname.replace('/old-path', '/new-path'), request.url)
+    )
+  }
+
+  // Add custom headers
+  const response = NextResponse.next()
+  response.headers.set('X-Custom-Header', 'value')
+  response.headers.set('X-Frame-Options', 'SAMEORIGIN')
+
+  return response
+}
+```
+
+---
+
+# SECTION 8: CACHING & REVALIDATION
+
+## Understanding Next.js Caching Layers
+
+Next.js has multiple caching layers. Understanding them is critical for performance.
+
+### Layer 1: Request Memoization
+
+Automatic within a single request:
+
+```jsx
+// All these calls result in ONE database query
+async function Dashboard() {
+  const user1 = await getUser(123)  // Executes
+  const user2 = await getUser(123)  // Returns cached result
+  const user3 = await getUser(123)  // Returns cached result
+
+  return<div>
+    {/* All three return same user data */}
+  </div>
+}
+```
+
+**Scope**: Only during a single server render. Once response is sent, cache is cleared.
+
+### Layer 2: Data Cache
+
+Persists across requests and deployments:
+
+```jsx
+// Cached indefinitely by default
+const data = await fetch('https://api.example.com/posts')
+
+// Revalidate every 60 seconds
+const data = await fetch('https://api.example.com/posts', {
+  next: { revalidate: 60 }
+})
+
+// Always fresh (no cache)
+const data = await fetch('https://api.example.com/posts', {
+  next: { revalidate: 0 }
+})
+```
+
+**What gets cached:**
+- Fetch responses
+- Database query results (if you manually cache them)
+
+**What doesn’t get cached:**
+- Dynamic functions like `cookies()`, `headers()`, `searchParams`
+- Request objects
+
+### Layer 3: Full Route Cache
+
+Pre-rendered HTML for static routes:
+
+```jsx
+// This entire page is cached at build time
+export default function BlogPost({ params }) {
+  return<article>{/* static content */}</article>
+}
+
+// Output: Cached HTML served instantly to all users
+```
+
+Forces dynamic rendering:
+
+```jsx
+// If you use dynamic functions, entire page becomes dynamic
+import { cookies } from 'next/headers'
+
+export default function Dashboard() {
+  const theme = cookies().get('theme') // This forces dynamic!
+  return<div>...</div>
+}
+
+// Output: Page is rendered per-request for each user
+```
+
+### Revalidation Strategies
+
+**Time-Based (ISR)**
+
+```jsx
+// Cache for 1 hour, then revalidate on next request
+export const revalidate = 3600
+
+export default async function Page() {
+  const data = await fetch('/api/data')
+  return<div>{data}</div>
+}
+```
+
+Timeline:
+1. First request at 10:00 → renders and caches HTML
+2. Request at 10:30 → serves cached HTML (no render)
+3. Request at 11:00 → cache expired, re-renders and caches new HTML
+4. Request at 11:15 → serves newly cached HTML
+
+**On-Demand (Event-Based)**
+
+```jsx
+// app/actions/posts.js
+'use server'
+
+import { revalidatePath, revalidateTag } from 'next/cache'
+
+export async function createPost(formData) {
+  const post = await db.posts.create({
+    title: formData.get('title'),
+    content: formData.get('content')
+  })
+
+  // Revalidate this specific path
+  revalidatePath('/blog')
+
+  // Or revalidate by tag
+  revalidateTag('posts')
+
+  return post
+}
+
+export async function updatePost(id, formData) {
+  const post = await db.posts.update(id, {
+    title: formData.get('title'),
+    content: formData.get('content')
+  })
+
+  // Revalidate both the list and individual post
+  revalidatePath('/blog')
+  revalidatePath(`/blog/${id}`)
+
+  return post
+}
+```
+
+With tag-based approach:
+
+```jsx
+// app/blog/page.js
+export const revalidate = 3600
+
+async function getPosts() {
+  return await fetch('/api/posts', {
+    next: { tags: ['posts'] }
+  }).then(r => r.json())
+}
+
+export default async function BlogList() {
+  const posts = await getPosts()
+  return<ul>{posts.map(p => <li>{p.title}</li>)}</ul>
+}
+
+// app/api/webhooks/posts/route.js
+// Called by external service when post is updated
+export async function POST(request) {
+  const event = await request.json()
+
+  if (event.type === 'post.published') {
+    // Revalidate only the 'posts' tag
+    revalidateTag('posts')
+  }
+
+  return Response.json({ received: true })
+}
+```
+
+### Real-World: E-commerce Product Page
+
+```jsx
+// app/products/[id]/page.js
+import { revalidatePath } from 'next/cache'
+
+// Revalidate every 24 hours
+export const revalidate = 86400
+
+export async function generateStaticParams() {
+  // Pre-render top 100 products at build time
+  const products = await db.products.find().limit(100)
+  return products.map(p => ({ id: p.id }))
+}
+
+export async function generateMetadata({ params }) {
+  const product = await fetch(`/api/products/${params.id}`, {
+    next: { tags: [`product-${params.id}`] }
+  }).then(r => r.json())
+
+  return {
+    title: product.name,
+    description: product.description,
+    openGraph: {
+      images: [product.image]
+    }
+  }
+}
+
+export default async function ProductPage({ params }) {
+  // Product info (stable, can cache longer)
+  const product = await fetch(`/api/products/${params.id}`, {
+    next: { tags: [`product-${params.id}`], revalidate: 86400 }
+  }).then(r => r.json())
+
+  // Inventory (changes frequently, revalidate hourly)
+  const inventory = await fetch(`/api/products/${params.id}/inventory`, {
+    next: { tags: [`inventory-${params.id}`], revalidate: 3600 }
+  }).then(r => r.json())
+
+  // Reviews (user-generated, always fresh)
+  const reviews = await fetch(`/api/products/${params.id}/reviews`, {
+    next: { revalidate: 0 }
+  }).then(r => r.json())
+
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>{product.description}</p>
+      <p>In Stock: {inventory.quantity}</p>
+      <Reviews data={reviews} />
+    </div>
+  )
+}
+
+// This runs when product is updated
+export async function onProductUpdate(productId) {
+  revalidateTag(`product-${productId}`)
+  revalidatePath(`/products/${productId}`)
+}
+```
+
+---
+
+# SECTION 9: ERROR HANDLING & BOUNDARIES
+
+## Error Boundaries: Graceful Error Handling
+
+Error boundaries catch errors in nested components and display fallback UI.
+
+### Basic Error Boundary
+
+```jsx
+// app/error.js
+'use client'
+
+import { useEffect } from 'react'
+
+export default function Error({ error, reset }) {
+  useEffect(() => {
+    // Log error to monitoring service
+    console.error('Error caught:', error)
+  }, [error])
+
+  return (
+    <div className="error-container">
+      <h2>Something went wrong!</h2>
+      <p>{error.message}</p>
+      <button onClick={() => reset()}>Try again</button>
+    </div>
+  )
+}
+```
+
+**How it works:**
+1. Error occurs in any component in `/` route
+2. Nearest `error.js` catches it
+3. Shows fallback UI
+4. User can click “Try again” to re-render
+
+### Nested Error Boundaries
+
+```
+app/
+  error.js                    (catches all errors in app)
+  dashboard/
+    error.js                  (catches errors in dashboard only)
+    settings/
+      error.js                (catches errors in settings only)
+```
+
+```jsx
+// app/dashboard/error.js
+'use client'
+
+export default function DashboardError({ error, reset }) {
+  return (
+    <div className="dashboard-error">
+      <h2>Dashboard Error</h2>
+      <p>{error.message}</p>
+      <button onClick={() => reset()}>Reload Dashboard</button>
+    </div>
+  )
+}
+
+// app/dashboard/settings/error.js
+'use client'
+
+export default function SettingsError({ error, reset }) {
+  return (
+    <div className="settings-error">
+      <h2>Settings Error</h2>
+      <details>
+        <summary>Error details</summary>
+        <pre>{error.stack}</pre>
+      </details>
+      <button onClick={() => reset()}>Reload Settings</button>
+    </div>
+  )
+}
+```
+
+When error happens in `/dashboard/settings`:
+1. First checks for `app/dashboard/settings/error.js`
+2. If not found, checks `app/dashboard/error.js`
+3. If not found, checks `app/error.js`
+
+### Global Error Boundary
+
+```jsx
+// app/global-error.js
+'use client'
+
+export default function GlobalError({ error, reset }) {
+  return (
+    <html>
+      <body>
+        <div className="global-error">
+          <h1>Critical Error</h1>
+          <p>{error.message}</p>
+          <button onClick={() => reset()}>Reset entire app</button>
+        </div>
+      </body>
+    </html>
+  )
+}
+```
+
+This catches errors that happen in root `layout.js` itself.
+
+### Not Found
+
+```jsx
+// app/not-found.js
+import Link from 'next/link'
+
+export default function NotFound() {
+  return (
+    <div>
+      <h1>404 - Page Not Found</h1>
+      <p>The page you're looking for doesn't exist.</p>
+      <Link href="/">Go home</Link>
+    </div>
+  )
+}
+```
+
+Explicitly trigger with:
+
+```jsx
+// app/products/[id]/page.js
+import { notFound } from 'next/navigation'
+
+export default async function ProductPage({ params }) {
+  const product = await db.products.findOne({ id: params.id })
+
+  if (!product) {
+    notFound() // Shows 404.js
+  }
+
+  return<div>{product.name}</div>
+}
+```
+
+### Real-World Error Handling Pattern
+
+```jsx
+// app/api/posts/[id]/route.js
+import { NextResponse } from 'next/server'
+
+export async function GET(request, { params }) {
+  try {
+    const post = await db.posts.findOne({ id: params.id })
+
+    if (!post) {
+      return NextResponse.json(
+        { error: 'Post not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(post)
+  } catch (error) {
+    console.error('Database error:', error)
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// app/blog/[slug]/page.js
+import { notFound } from 'next/navigation'
+
+export default async function BlogPost({ params }) {
+  try {
+    const post = await fetch(`/api/posts/${params.slug}`)
+
+    if (!post.ok) {
+      if (post.status === 404) {
+        notFound()
+      }
+      throw new Error('Failed to fetch post')
+    }
+
+    const data = await post.json()
+    return<article>{data.content}</article>
+  } catch (error) {
+    // This will trigger error.js boundary
+    throw new Error(`Failed to load post:${error.message}`)
+  }
+}
+
+// app/error.js
+'use client'
+
+export default function Error({ error, reset }) {
+  return (
+    <div>
+      <h2>Failed to load post</h2>
+      <p>{error.message}</p>
+      <button onClick={() => reset()}>Try again</button>
+    </div>
+  )
+}
+```
+
+---
+
+# SECTION 10: PARALLEL ROUTES & INTERCEPTING ROUTES
+
+## Parallel Routes: Simultaneous Route Rendering
+
+Parallel routes let you render multiple pages in the same layout, navigable independently.
+
+### Use Case: Dashboard with Sidebar
+
+```
+app/
+  dashboard/
+    layout.js
+    @menu/
+      (.)settings/
+        page.js
+    @content/
+      page.js
+      analytics/
+        page.js
+```
+
+```jsx
+// app/dashboard/layout.js
+export default function DashboardLayout({
+  children,
+  menu,
+  content
+}) {
+  return (
+    <div className="dashboard">
+      <aside className="menu">
+        {menu}
+      </aside>
+      <main className="content">
+        {content}
+      </main>
+    </div>
+  )
+}
+
+// When user visits /dashboard:
+// - children renders /dashboard/page.js
+// - menu renders /dashboard/@menu/default.js (or page.js)
+// - content renders /dashboard/@content/page.js
+
+// When user visits /dashboard/settings:
+// - children still renders /dashboard/page.js
+// - menu renders /dashboard/@menu/settings/page.js
+// - content still renders /dashboard/@content/page.js
+```
+
+### Conditional Rendering with Parallel Routes
+
+```jsx
+// app/dashboard/layout.js
+import { authenticate } from '@/lib/auth'
+
+export default async function DashboardLayout({
+  children,
+  authenticated,
+  unauthenticated
+}) {
+  const user = await authenticate()
+
+  if (!user) {
+    return unauthenticated
+  }
+
+  return (
+    <div>
+      <Header user={user} />
+      {authenticated}
+    </div>
+  )
+}
+
+// app/dashboard/@authenticated/page.js
+export default function AuthenticatedDashboard() {
+  return<div>Your dashboard content</div>
+}
+
+// app/dashboard/@unauthenticated/page.js
+export default function UnauthenticatedDashboard() {
+  return<div>Please log in</div>
+}
+```
+
+### Error Handling in Parallel Routes
+
+Each slot can have its own error boundary:
+
+```jsx
+// app/dashboard/@analytics/error.js
+'use client'
+
+export default function AnalyticsError({ error, reset }) {
+  return (
+    <div className="analytics-error">
+      <p>Analytics failed to load</p>
+      <button onClick={() => reset()}>Retry</button>
+    </div>
+  )
+}
+
+// app/dashboard/@reports/error.js
+'use client'
+
+export default function ReportsError({ error, reset }) {
+  return (
+    <div className="reports-error">
+      <p>Reports failed to load</p>
+      <button onClick={() => reset()}>Retry</button>
+    </div>
+  )
+}
+```
+
+If analytics errors, only that slot shows error. Reports still load normally.
+
+## Intercepting Routes: Modal Pattern
+
+Intercepting routes load a route within current context without navigation.
+
+**Use case**: Click photo in feed → modal opens showing photo, URL changes to `/photo/123`, but close modal → returns to feed.
+
+```
+app/
+  feed/
+    page.js                    /feed
+    @modal/
+      (.)photo/
+        [id]/
+          page.js             Intercepts /photo/[id]
+  photo/
+    [id]/
+      page.js                 Direct access to /photo/[id]
+```
+
+```jsx
+// app/feed/page.js
+export default function Feed() {
+  const photos = [
+    { id: 1, src: '/photo1.jpg' },
+    { id: 2, src: '/photo2.jpg' }
+  ]
+
+  return (
+    <div className="feed">
+      {photos.map(photo => (
+        <a key={photo.id} href={`/photo/${photo.id}`}>
+          <img src={photo.src} alt="" />
+        </a>
+      ))}
+    </div>
+  )
+}
+
+// app/feed/@modal/(.)photo/[id]/page.js
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function PhotoModal({ params }) {
+  const router = useRouter()
+
+  return (
+    <div className="modal-overlay" onClick={() => router.back()}>
+      <dialog open className="modal" onClick={e => e.stopPropagation()}>
+        <button onClick={() => router.back()}>Close</button>
+        <img src={`/photo-${params.id}.jpg`} alt="" />
+      </dialog>
+    </div>
+  )
+}
+
+// app/photo/[id]/page.js
+// Shown when user navigates directly to /photo/123 or from link outside feed
+export default function PhotoPage({ params }) {
+  return (
+    <div className="photo-page">
+      <img src={`/photo-${params.id}.jpg`} alt="" />
+    </div>
+  )
+}
+```
+
+**Intercept conventions:**
+- `(.)` same level: `/feed/(.)photo` intercepts `/photo`
+- `(..)` one up: `/app/(..)/photo` intercepts `/photo`
+- `(..)(..)` two up: `/app/(..)(..)/ photo` intercepts `/photo`
+- `(...)` from root: `/app/(...)/photo` intercepts `/photo`
+
+---
+
+# SECTION 11: PERFORMANCE OPTIMIZATION
+
+## Image Optimization
+
+The `next/image` component optimizes images automatically.
+
+```jsx
+import Image from 'next/image'
+
+export default function Hero() {
+  return (
+    <Image
+      src="/hero.jpg"
+      alt="Hero"
+      width={1200}
+      height={600}
+      priority // Load immediately (for above-fold)
+      quality={75} // 0-100, default 75
+    />
+  )
+}
+```
+
+Benefits:
+- Automatic format optimization (WebP for supported browsers)
+- Responsive sizes (different sizes for different devices)
+- Lazy loading (load when entering viewport)
+- Prevents layout shift (reserved space)
+
+## Script Optimization
+
+```jsx
+import Script from 'next/script'
+
+export default function Page() {
+  return (
+    <>
+      {/* Load immediately, blocks rendering */}
+      <Script src="..." strategy="beforeInteractive" />
+
+      {/* Load after page interactive */}
+      <Script src="..." strategy="afterInteractive" />
+
+      {/* Load when idle (lowest priority) */}
+      <Script src="..." strategy="lazyOnload" />
+    </>
+  )
+}
+```
+
+## Font Optimization
+
+```jsx
+// app/layout.js
+import { Inter, Playfair_Display } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'] })
+const playfair = Playfair_Display({ weight: '700' })
+
+export default function RootLayout({ children }) {
+  return (
+    <html className={inter.className}>
+      <body>
+        <h1 className={playfair.className}>Title</h1>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+Next.js downloads fonts at build time and self-hosts them, eliminating network requests.
+
+---
+
+# SECTION 12: BEST PRACTICES & PATTERNS
+
+## 1. When to Use Each Data Fetching Method
+
+```
+Need data for page rendering?
+├─ Yes, data is the same for all users
+│  ├─ Data rarely changes → Static generation
+│  └─ Data changes sometimes → ISR with revalidate
+├─ Yes, data is user-specific
+│  └─ Dynamic rendering (use cookies, headers, etc)
+└─ No, need data after render
+   └─ Client fetch with useEffect (not recommended)
+
+Need to mutate data?
+├─ Form submission → Server Action
+├─ API for external clients → Route Handler
+└─ API for internal client components → Server Action or Route Handler
+```
+
+## 2. The N+1 Problem
+
+❌ **Bad: N+1 queries**
+
+```jsx
+export default async function PostsList() {
+  const posts = await db.posts.find().limit(10)
+
+  // This queries database N+1 times!
+  // 1 for posts, then 1 per post to get author
+  return (
+    <ul>
+      {posts.map(post => (
+        <li key={post.id}>
+          {post.title} by <AuthorName authorId={post.authorId} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// AuthorName is a Server Component that fetches each author
+async function AuthorName({ authorId }) {
+  const author = await db.authors.findOne({ id: authorId })
+  return<span>{author.name}</span>
+}
+```
+
+✅ **Good: Batched queries**
+
+```jsx
+export default async function PostsList() {
+  // Get all posts and authors with join
+  const posts = await db.posts
+    .find()
+    .populate('author')
+    .limit(10)
+
+  return (
+    <ul>
+      {posts.map(post => (
+        <li key={post.id}>
+          {post.title} by {post.author.name}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+Or with Server Components:
+
+✅ **Good: Request memoization**
+
+```jsx
+async function getPostsWithAuthors() {
+  // Get posts
+  const posts = await db.posts.find().limit(10)
+
+  // Get all unique authors (once)
+  const authorIds = [...new Set(posts.map(p => p.authorId))]
+  const authors = await db.authors.find({
+    id: { $in: authorIds }
+  })
+
+  // Merge
+  return posts.map(post => ({
+    ...post,
+    author: authors.find(a => a.id === post.authorId)
+  }))
+}
+
+export default async function PostsList() {
+  const posts = await getPostsWithAuthors()
+
+  return (
+    <ul>
+      {posts.map(post => (
+        <li key={post.id}>
+          {post.title} by {post.author.name}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## 3. Accessibility with Search Params
+
+```jsx
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function Filters() {
+  const searchParams = useSearchParams()
+
+  return (
+    <form>
+      {/* Make sure form inputs have labels */}
+      <div>
+        <label htmlFor="category">Category</label>
+        <select
+          id="category"
+          name="category"
+          defaultValue={searchParams.get('category') || ''}
+          aria-label="Filter by category"
+        >
+          <option value="">All</option>
+          <option value="electronics">Electronics</option>
+        </select>
+      </div>
+
+      <button type="submit">Apply Filters</button>
+    </form>
+  )
+}
+```
+
+## 4. Type-Safe Route Params
+
+```jsx
+// lib/types.ts
+export type ProductPageParams = {
+  params: {
+    category: string
+    id: string
+  }
+}
+
+export type ProductPageSearch = {
+  searchParams: {
+    sort?: string
+    page?: string
+  }
+}
+
+// app/products/[category]/[id]/page.tsx
+import { ProductPageParams, ProductPageSearch } from '@/lib/types'
+
+export default async function ProductPage({
+  params,
+  searchParams
+}: ProductPageParams & ProductPageSearch) {
+  // TypeScript knows the exact types
+  const { category, id } = params
+  const { sort = 'name', page = '1' } = searchParams
+
+  return<div>Product: {id} in {category}</div>
+}
+```
+
+## 5. Error Recovery Patterns
+
+```jsx
+// app/components/DataComponent.jsx
+'use client'
+
+import { useState, useEffect } from 'react'
+
+export default function DataComponent() {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
+  const [retries, setRetries] = useState(0)
+  const MAX_RETRIES = 3
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const res = await fetch('/api/data')
+        if (!res.ok) throw new Error('Failed to fetch')
+        const data = await res.json()
+        setData(data)
+        setError(null)
+      } catch (err) {
+        setError(err.message)
+
+        // Retry with exponential backoff
+        if (retries < MAX_RETRIES) {
+          setTimeout(() => {
+            setRetries(r => r + 1)
+          }, Math.pow(2, retries) * 1000)
+        }
+      }
+    }
+
+    fetchData()
+  }, [retries])
+
+  if (error) {
+    return (
+      <div>
+        <p>Error: {error}</p>
+        {retries < MAX_RETRIES && (
+          <p>Retrying... ({retries}/{MAX_RETRIES})</p>
+        )}
+        {retries >= MAX_RETRIES && (
+          <button onClick={() => setRetries(0)}>Try Again</button>
+        )}
+      </div>
+    )
+  }
+
+  if (!data) return<div>Loading...</div>
+
+  return<div>{/* render data */}</div>
+}
+```
+
+---
+
+# SECTION 13: COMMON PATTERNS & RECIPES
+
+## Pattern: Protected Routes
+
+```jsx
+// lib/auth.ts
+import { cookies } from 'next/headers'
+import { jwtVerify } from 'jose'
+
+const secret = new TextEncoder().encode(process.env.JWT_SECRET!)
+
+export async function getSession() {
+  const cookieStore = cookies()
+  const token = cookieStore.get('session')?.value
+
+  if (!token) return null
+
+  try {
+    const verified = await jwtVerify(token, secret)
+    return verified.payload
+  } catch (err) {
+    return null
+  }
+}
+
+// middleware.ts
+import { getSession } from '@/lib/auth'
+
+export async function middleware(request: NextRequest) {
+  const session = await getSession()
+
+  if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+}
+
+export const config = {
+  matcher: ['/dashboard/:path*']
+}
+```
+
+## Pattern: Admin Dashboard with Role-Based Access
+
+```jsx
+// app/admin/layout.js
+import { getSession } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+
+export default async function AdminLayout({ children }) {
+  const session = await getSession()
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  if (session.role !== 'admin') {
+    redirect('/unauthorized')
+  }
+
+  return (
+    <div className="admin-layout">
+      <AdminSidebar user={session} />
+      <main>{children}</main>
+    </div>
+  )
+}
+```
+
+## Pattern: Real-Time Updates with Server-Sent Events
+
+```jsx
+// app/api/events/route.js
+export async function GET(request) {
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        // Send initial data
+        controller.enqueue(`data:${JSON.stringify({ type: 'init' })}\n\n`)
+
+        // Listen for database changes
+        const unsubscribe = db.onUpdate('posts', (post) => {
+          controller.enqueue(`data:${JSON.stringify(post)}\n\n`)
+        })
+
+        // Keep connection alive
+        const interval = setInterval(() => {
+          controller.enqueue(`: heartbeat\n\n`)
+        }, 30000)
+
+        request.signal.addEventListener('abort', () => {
+          clearInterval(interval)
+          unsubscribe()
+          controller.close()
+        })
+      } catch (error) {
+        controller.error(error)
+      }
+    }
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    }
+  })
+}
+
+// Client component
+'use client'
+
+import { useEffect, useState } from 'react'
+
+export default function LiveUpdates() {
+  const [posts, setPosts] = useState([])
+
+  useEffect(() => {
+    const eventSource = new EventSource('/api/events')
+
+    eventSource.onmessage = (event) => {
+      const post = JSON.parse(event.data)
+      setPosts(p => [post, ...p])
+    }
+
+    return () => eventSource.close()
+  }, [])
+
+  return<div>{posts.map(p => <div key={p.id}>{p.title}</div>)}</div>
+}
+```
+
+---
+
+# SECTION 14: DECISION TREES & QUICK REFERENCE
+
+## Choosing Rendering Strategy
+
+```
+Will content be the same for all users?
+├─ Yes
+│  ├─ Will it ever change?
+│  │  ├─ No → Static (cached forever)
+│  │  └─ Yes → ISR (revalidate: 3600)
+│  └─ Is it in the URL?
+│     ├─ No → Static Generation
+│     └─ Yes → generateStaticParams() + ISR
+│
+└─ No (user-specific)
+   ├─ Does it use cookies/headers?
+   │  ├─ Yes → Dynamic Rendering
+   │  └─ No → Check next question
+   └─ Is it loaded after render?
+      ├─ Yes → Client fetch
+      └─ No → Server fetch (might be static or dynamic)
+```
+
+## Choosing Between Server Actions vs Route Handlers
+
+```
+Will this be called from a Client Component?
+├─ Yes
+│  ├─ Is it a form submission?
+│  │  ├─ Yes → Server Action
+│  │  └─ No → Depends on next question
+│  └─ Do external services need to call it?
+│     ├─ Yes → Route Handler
+│     └─ No → Server Action (simpler)
+│
+└─ No
+   ├─ Is it for external API consumption?
+   │  ├─ Yes → Route Handler
+   │  └─ No → Can be either (Route Handler for REST-style)
+   └─ Do you need webhooks?
+      ├─ Yes → Route Handler
+      └─ No → Either works
+```
+
+## Choosing Between Parallel Routes vs Separate Pages
+
+```
+Do you want independent, simultaneous views?
+├─ Yes
+│  ├─ Can they share a layout?
+│  │  ├─ Yes → Parallel Routes
+│  │  └─ No → Separate pages
+│  └─ Should they navigate independently?
+│     ├─ Yes → Parallel Routes
+│     └─ No → Separate pages
+
+└─ No → Separate pages
+```
+
+---
+
+# SECTION 15: ACCESSIBILITY DEEP DIVE
+
+## Semantic HTML in Server Components
+
+```jsx
+// ❌ Bad: Divs everywhere
+export default function Header() {
+  return (
+    <div className="header">
+      <div className="logo">My Site</div>
+      <div className="nav">
+        <div>Home</div>
+        <div>About</div>
+        <div>Contact</div>
+      </div>
+    </div>
+  )
+}
+
+// ✅ Good: Semantic HTML
+export default function Header() {
+  return (
+    <header className="header">
+      <h1 className="logo">My Site</h1>
+      <nav className="nav">
+        <a href="/">Home</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+      </nav>
+    </header>
+  )
+}
+```
+
+## Accessible Forms with Server Actions
+
+```jsx
+// ✅ Accessible form
+import { subscribeAction } from '@/app/actions/newsletter'
+
+export default function NewsletterForm() {
+  return (
+    <form action={subscribeAction} className="newsletter-form">
+      <fieldset>
+        <legend>Subscribe to our newsletter</legend>
+
+        <div className="form-group">
+          <label htmlFor="email">Email address</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="you@example.com"
+            required
+            aria-required="true"
+            aria-describedby="email-help"
+          />
+          <small id="email-help">
+            We'll never share your email
+          </small>
+        </div>
+
+        <button type="submit">Subscribe</button>
+      </fieldset>
+    </form>
+  )
+}
+```
+
+## Keyboard Navigation & Focus Management
+
+```jsx
+// ✅ Keyboard accessible dropdown
+'use client'
+
+import { useRef, useState } from 'react'
+
+export default function Dropdown({ items }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef(null)
+  const triggerRef = useRef(null)
+
+  const handleKeyDown = (e) => {
+    switch (e.key) {
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        setIsOpen(!isOpen)
+        break
+      case 'Escape':
+        setIsOpen(false)
+        triggerRef.current?.focus()
+        break
+      case 'ArrowDown':
+        e.preventDefault()
+        menuRef.current?.querySelector('a')?.focus()
+        break
+    }
+  }
+
+  return (
+    <div className="dropdown">
+      <button
+        ref={triggerRef}
+        onClick={() => setIsOpen(!isOpen)}
+        onKeyDown={handleKeyDown}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        className="dropdown-trigger"
+      >
+        Menu
+      </button>
+
+      {isOpen && (
+        <menu ref={menuRef} className="dropdown-menu">
+          {items.map(item => (
+            <li key={item.id}>
+              <a href={item.href}>
+                {item.label}
+              </a>
+            </li>
+          ))}
+        </menu>
+      )}
+    </div>
+  )
+}
+```
+
+## ARIA Labels for Complex Components
+
+```jsx
+// ✅ Accessible data table
+export default function DataTable({ data, columns }) {
+  return (
+    <div className="table-container" role="region" aria-label="Data table">
+      <table aria-label={`Table of${data.length} items`}>
+        <thead>
+          <tr>
+            {columns.map(col => (
+              <th
+                key={col.key}
+                scope="col"
+                aria-sort={col.sortable ? 'none' : undefined}
+              >
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(row => (
+            <tr key={row.id} aria-label={`Row${row.id}`}>
+              {columns.map(col => (
+                <td key={col.key}>
+                  {row[col.key]}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+```
+
+## Skip Links for Navigation
+
+```jsx
+// ✅ Skip to main content
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+
+        <Header />
+
+        <main id="main-content" tabIndex={-1}>
+          {children}
+        </main>
+
+        <Footer />
+      </body>
+    </html>
+  )
+}
+
+// In CSS:
+// .skip-link {
+//   position: absolute;
+//   top: -40px;
+//   left: 0;
+//   background: #000;
+//   color: #fff;
+//   padding: 8px;
+//   text-decoration: none;
+//   z-index: 100;
+// }
+//
+// .skip-link:focus {
+//   top: 0;
+// }
+```
+
+---
+
+# SECTION 16: TESTING PATTERNS
+
+## Testing Server Components
+
+```jsx
+// app/__tests__/dashboard.test.js
+import { render } from '@testing-library/react'
+import Dashboard from '@/app/dashboard/page'
+import * as auth from '@/lib/auth'
+
+jest.mock('@/lib/auth')
+
+describe('Dashboard', () => {
+  it('renders dashboard for authenticated users', async () => {
+    auth.getSession.mockResolvedValue({
+      userId: '123',
+      email: 'test@example.com'
+    })
+
+    const { getByText } = render(await Dashboard())
+
+    expect(getByText(/welcome/i)).toBeInTheDocument()
+  })
+
+  it('shows error for unauthenticated users', async () => {
+    auth.getSession.mockResolvedValue(null)
+
+    // Should redirect or show error
+    expect(() => {
+      render(await Dashboard())
+    }).toThrow()
+  })
+})
+```
+
+## Testing Server Actions
+
+```jsx
+// app/__tests__/actions.test.js
+import { createPost } from '@/app/actions/posts'
+import * as db from '@/lib/db'
+
+jest.mock('@/lib/db')
+
+describe('createPost', () => {
+  it('creates a post with valid data', async () => {
+    const formData = new FormData()
+    formData.append('title', 'Test Post')
+    formData.append('content', 'Test content')
+
+    db.posts.create.mockResolvedValue({
+      id: '1',
+      title: 'Test Post',
+      content: 'Test content'
+    })
+
+    const result = await createPost(formData)
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        title: 'Test Post',
+        content: 'Test content'
+      })
+    )
+    expect(db.posts.create).toHaveBeenCalled()
+  })
+
+  it('throws error for empty title', async () => {
+    const formData = new FormData()
+    formData.append('title', '')
+    formData.append('content', 'Test content')
+
+    await expect(createPost(formData)).rejects.toThrow('Title required')
+  })
+})
+```
+
+## Testing Middleware
+
+```jsx
+// middleware.test.js
+import { middleware } from '@/middleware'
+import { NextRequest, NextResponse } from 'next/server'
+
+describe('middleware', () => {
+  it('redirects unauthenticated users to login', () => {
+    const request = new NextRequest(
+      new URL('http://localhost:3000/dashboard'),
+      {
+        cookies: new Map()
+      }
+    )
+
+    const response = middleware(request)
+
+    expect(response.status).toBe(307) // Redirect
+    expect(response.headers.get('location')).toContain('/login')
+  })
+
+  it('allows authenticated users to dashboard', () => {
+    const request = new NextRequest(
+      new URL('http://localhost:3000/dashboard'),
+      {
+        cookies: new Map([['auth-token', 'valid-token']])
+      }
+    )
+
+    const response = middleware(request)
+
+    expect(response.status).toBe(200) // Allow
+  })
+})
+```
+
+---
+
+# SECTION 17: DEPLOYMENT & PRODUCTION
+
+## Environment Variables
+
+```bash
+# .env.local (local development only)
+DATABASE_URL=postgresql://user:pass@localhost/db
+JWT_SECRET=dev-secret-123
+
+# .env.production (production secrets - add via Vercel/hosting provider)
+DATABASE_URL=postgresql://prod-user:prod-pass@prod.db.com/db
+JWT_SECRET=prod-secret-xyz
+STRIPE_SECRET_KEY=sk_live_...
+
+# .env.public or NEXT_PUBLIC_ (safe for browser)
+NEXT_PUBLIC_API_URL=https://api.example.com
+NEXT_PUBLIC_ANALYTICS_ID=abc123
+```
+
+## Security Best Practices
+
+```jsx
+// ✅ Don't expose secrets to browser
+export async function GET() {
+  // ❌ NEVER do this
+  const secret = process.env.STRIPE_SECRET_KEY
+  return NextResponse.json({ secret })
+
+  // ✅ Use secrets only in server-side code
+  const payment = await stripe.charges.create({
+    amount: 100,
+    // STRIPE_SECRET_KEY is only used here, never sent to client
+  })
+
+  return NextResponse.json({ success: true })
+}
+
+// ✅ Validate and sanitize inputs
+import { z } from 'zod'
+
+export async function POST(request) {
+  const schema = z.object({
+    email: z.string().email(),
+    age: z.number().min(0).max(150),
+  })
+
+  const body = await request.json()
+
+  try {
+    const validated = schema.parse(body)
+    // Use validated data
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Invalid input' },
+      { status: 400 }
+    )
+  }
+}
+
+// ✅ Rate limit API routes
+export const config = {
+  matcher: ['/api/auth/login']
+}
+
+// ✅ Add security headers
+export function middleware(request) {
+  const response = NextResponse.next()
+
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('X-Frame-Options', 'DENY')
+  response.headers.set('X-XSS-Protection', '1; mode=block')
+  response.headers.set(
+    'Strict-Transport-Security',
+    'max-age=31536000; includeSubDomains'
+  )
+
+  return response
+}
+```
+
+## Monitoring & Error Tracking
+
+```jsx
+// lib/errorTracking.js
+import * as Sentry from "@sentry/nextjs"
+
+export function captureError(error, context) {
+  if (process.env.NODE_ENV === 'production') {
+    Sentry.captureException(error, {
+      contexts: { custom: context }
+    })
+  } else {
+    console.error(error, context)
+  }
+}
+
+// app/error.js
+'use client'
+
+import { useEffect } from 'react'
+import { captureError } from '@/lib/errorTracking'
+
+export default function Error({ error, reset }) {
+  useEffect(() => {
+    captureError(error, { page: 'dashboard' })
+  }, [error])
+
+  return (
+    <div>
+      <h2>Something went wrong</h2>
+      <button onClick={() => reset()}>Try again</button>
+    </div>
+  )
+}
+```
+
+---
+
+# SECTION 18: CHECKLISTS & TEMPLATES
+
+## New Project Setup Checklist
+
+- [ ]  Initialize with `create.t3.gg` or `create-next-app`
+- [ ]  Set up Git and version control
+- [ ]  Configure ESLint and Prettier
+- [ ]  Set up TypeScript (recommended)
+- [ ]  Create folder structure:
+    - `app/` - routes and pages
+    - `lib/` - utilities, database, helpers
+    - `components/` - reusable components
+    - `public/` - static assets
+- [ ]  Set up environment variables (`.env.local`)
+- [ ]  Connect database
+- [ ]  Set up authentication
+- [ ]  Configure CSS (Tailwind recommended)
+- [ ]  Set up testing (Jest + React Testing Library)
+- [ ]  Add GitHub Actions for CI/CD
+- [ ]  Configure deployment (Vercel recommended)
+
+## Performance Optimization Checklist
+
+- [ ]  Enable Static Rendering where possible
+- [ ]  Implement ISR for data that changes infrequently
+- [ ]  Use Suspense for streaming components
+- [ ]  Optimize images with `next/image`
+- [ ]  Split code with dynamic imports
+- [ ]  Monitor Web Vitals
+- [ ]  Implement caching headers
+- [ ]  Use CDN for static assets
+- [ ]  Enable compression (gzip, brotli)
+- [ ]  Monitor bundle size
+
+## Security Checklist
+
+- [ ]  Store secrets in `.env.local` (never commit)
+- [ ]  Use HTTPS only in production
+- [ ]  Validate all user inputs
+- [ ]  Sanitize data before displaying
+- [ ]  Use CSRF protection for forms
+- [ ]  Implement rate limiting for APIs
+- [ ]  Add security headers in middleware
+- [ ]  Keep dependencies updated
+- [ ]  Use strong authentication
+- [ ]  Audit third-party packages
+
+## Pre-Launch Checklist
+
+- [ ]  Test all routes and functionality
+- [ ]  Test on mobile devices
+- [ ]  Check accessibility (a11y)
+- [ ]  Optimize images and assets
+- [ ]  Set up error tracking (Sentry)
+- [ ]  Set up analytics
+- [ ]  Configure email notifications
+- [ ]  Set up backups
+- [ ]  Document API endpoints
+- [ ]  Create deployment runbook
+- [ ]  Set up monitoring and alerts
+
+---
+
+# SECTION 19: TROUBLESHOOTING GUIDE
+
+## Issue: Hydration Mismatch
+
+**Problem**: “Text content did not match” error in console
+
+**Causes**:
+- Using `Math.random()` on server and client
+- Using `new Date()` directly (timezone differences)
+- Rendering different content on server vs client
+
+**Solution**:
+
+```jsx
+'use client'
+
+import { useEffect, useState } from 'react'
+
+export default function RandomComponent() {
+  const [mounted, setMounted] = useState(false)
+  const [random, setRandom] = useState(0)
+
+  useEffect(() => {
+    // This runs only on client after hydration
+    setRandom(Math.random())
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return<div>Loading...</div> // Matches server render
+  }
+
+  return<div>{random}</div>
+}
+```
+
+## Issue: Stale Data After Mutation
+
+**Problem**: Data doesn’t update after Server Action
+
+**Cause**: Cache isn’t revalidated
+
+**Solution**:
+
+```jsx
+'use server'
+
+import { revalidatePath, revalidateTag } from 'next/cache'
+
+export async function updatePost(id, data) {
+  await db.posts.update(id, data)
+
+  // Revalidate cache
+  revalidatePath('/blog')
+  revalidateTag(`post-${id}`)
+}
+```
+
+## Issue: Server Action Timeout
+
+**Problem**: Server Action takes too long and times out
+
+**Solution**:
+
+```jsx
+'use server'
+
+export async function longRunningAction(data) {
+  // Break into smaller chunks
+  const chunks = chunkData(data)
+
+  for (const chunk of chunks) {
+    await processChunk(chunk)
+    // Allow other requests to process
+    await new Promise(resolve => setTimeout(resolve, 0))
+  }
+}
+
+// Or use background jobs
+export async function triggerBackgroundJob(data) {
+  // Queue job
+  await queue.add('process-data', data)
+
+  return { status: 'queued' }
+}
+```
+
+## Issue: Pages Not Generating Statically
+
+**Problem**: Pages that should be static are being rendered dynamically
+
+**Check**:
+- Are you using `cookies()`, `headers()`, or `searchParams`?
+- Are you using `fetch` without `cache` options?
+- Are you importing Client Components?
+
+**Solution**:
+
+```jsx
+// ❌ This forces dynamic rendering
+export default function Page() {
+  const theme = cookies().get('theme')
+  return<div>{theme}</div>
+}
+
+// ✅ Move to Client Component
+'use client'
+
+import { cookies } from 'next/headers'
+
+export default function ThemeToggle() {
+  const theme = cookies().get('theme')
+  return<div>{theme}</div>
+}
+
+// ✅ Then use as child in Server Component
+export default function Page() {
+  return<ThemeToggle />
+}
+```
+
+## Issue: Layout Not Persisting
+
+**Problem**: Layout re-renders on navigation
+
+**Check**:
+- Are you using Template instead of Layout?
+- Are you making request to user-specific data in layout?
+
+**Solution**:
+
+```jsx
+// ❌ Dynamic layout (re-renders per request)
+export default function Layout({ children }) {
+  const user = cookies().get('user')
+  return<div>{user}</div>
+}
+
+// ✅ Static layout (persists across routes)
+export default function Layout({ children }) {
+  return (
+    <div>
+      <Header />
+      {children}
+      <Footer />
+    </div>
+  )
+}
+```
+
+---
+
+# SECTION 20: RESOURCES & FURTHER LEARNING
+
+## Official Documentation
+
+- [Next.js Docs](https://nextjs.org/docs)
+- [React Docs - Server Components](https://react.dev/reference/rsc/server-components)
+- [Vercel Deployment](https://vercel.com/docs)
+
+## Recommended Learning
+
+- [Next.js Official Learn](https://nextjs.org/learn)
+- [Next.js Fundamentals Course](https://github.com/Hendrixer/next.js-fundamentals)
+- [Web.dev - Core Web Vitals](https://web.dev/vitals/)
+
+## Tools & Libraries
+
+- **Testing**: Jest, React Testing Library, Playwright
+- **Validation**: Zod, Yup
+- **Forms**: React Hook Form
+- **Styling**: Tailwind CSS, CSS Modules
+- **Database**: Prisma, Drizzle, MongoDB
+- **Authentication**: NextAuth.js, Auth0, Clerk
+- **Error Tracking**: Sentry
+- **Analytics**: Vercel Analytics, Mixpanel
+
+## Related Concepts
+
+- Database Design & Optimization
+- SQL & Query Performance
+- REST API Design
+- GraphQL
+- Real-time Communication (WebSockets, SSE)
+- Microservices Architecture
+- DevOps & Deployment
+
+---
+
+## Quick Reference Table
+
+| Concept | Best For | Example |
+| --- | --- | --- |
+| Server Component | Fetching data, secure logic | `async function Page() {}` |
+| Client Component | Interactivity, hooks | `'use client'` + `useState` |
+| Server Action | Mutations, forms | `'use server'` function |
+| Route Handler | APIs, webhooks | `export async function POST()` |
+| Middleware | Auth, i18n, logging | `middleware.ts` |
+| Suspense | Streaming, loading states | `<Suspense fallback={...}>` |
+| Static Rendering | Blogs, marketing pages | Default behavior |
+| Dynamic Rendering | User-specific content | Using cookies/headers |
+| ISR | Semi-static data | `revalidate: 3600` |
+| Parallel Routes | Dashboard layouts | `@slot` pattern |
+| Intercepting Routes | Modals, overlays | `(.)` pattern |
+
+This comprehensive guide covers the most important and complex topics in Next.js with practical examples, real-world patterns, and deep explanations of how and why things work. Use it as both a learning resource and a reference while building Next.js applications. 
+
+### Authentication Middleware
+
+```jsx
+import { NextResponse } from ‘next/server’
+import type { NextRequest } from ‘next/server’
+
+export function middleware(request: NextRequest) {
+// Get the pathname
+const { pathname } = request.nextUrl
+
+// Check if user has auth token
+const token = request.cookies.get(‘auth-token’)?.value
+
+// If visiting protected route without token
+if (pathname.startsWith(‘/dashboard’) && !token) {
+// Redirect to login
+return NextResponse.redirect(new URL(‘/login’, request.url))
+}
+
+// If on login page with valid token
+if (pathname === ‘/login’ && token) {
+// Redirect to dashboard
+return NextResponse.redirect(new URL(‘/dashboard’, request.url))
+}
+
+// Otherwise, continue
+return NextResponse.next()
+}
+
+export const config = {
+matcher: [‘/dashboard/:path*’, ’/admin/:path*’, ‘/login’]
+}
+
+```
+
+### Internationalization (i18n) Middleware
+
+```jsx
+// middleware.js
+import { NextResponse } from 'next/server'
+
+const SUPPORTED_LANGS = ['en', 'es', 'fr', 'de']
+const DEFAULT_LANG = 'en'
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Check if pathname starts with language code
+  const pathnameHasLang = SUPPORTED_LANGS.some(
+    lang => pathname.startsWith(`/${lang}/`) || pathname === `/${lang}`
+  )
+
+  // If language code is present, continue
+  if (pathnameHasLang) {
+    return NextResponse.next()
+  }
+
+  // Get preferred language from Accept-Language header
+  const acceptLanguage = request.headers.get('accept-language') || ''
+  const preferredLang = acceptLanguage
+    .split(',')[0]
+    .split('-')[0]
+    .toLowerCase()
+
+  // Use preferred lang if supported, otherwise default
+  const lang = SUPPORTED_LANGS.includes(preferredLang)
+    ? preferredLang
+    : DEFAULT_LANG
+
+  // Redirect with language prefix
+  return NextResponse.redirect(
+    new URL(`/${lang}${pathname}`, request.url)
+  )
+}
+
+export const config = {
+  matcher: ['/((?!_next|api).*)']
+}
+```
+
+Then structure your app like:
+
+```
+app/
+  [lang]/
+    layout.js
+    page.js
+    blog/
+      [slug]/
+        page.js
+```
+
+```jsx
+// app/[lang]/page.js
+export default function Home({ params: { lang } }) {
+  const messages = {
+    en: 'Welcome',
+    es: 'Bienvenido',
+    fr: 'Bienvenue',
+    de: 'Willkommen'
+  }
+
+  return <h1>{messages[lang]}</h1>
+}
+```
+
